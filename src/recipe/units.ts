@@ -137,6 +137,72 @@ export function lookupUnit(text: string): UnitInfo | null {
 }
 
 /**
+ * Metric ladders, used to keep a scaled amount at a human size.
+ *
+ * Multiplying a recipe by thirty is arithmetically fine and practically poor:
+ * "8335 g de sucre" is correct, and nobody weighs eight thousand grams. Each
+ * measured unit therefore knows the unit above and below it, so a large amount
+ * climbs the ladder and a small one comes back down.
+ */
+interface UnitStep {
+  /** Unit to switch to, and how many of the current unit it holds. */
+  to: string;
+  per: number;
+}
+
+const PROMOTIONS: Record<string, UnitStep> = {
+  mg: { to: "g", per: 1000 },
+  g: { to: "kg", per: 1000 },
+  ml: { to: "l", per: 1000 },
+  cl: { to: "l", per: 100 },
+  dl: { to: "l", per: 10 },
+};
+
+const DEMOTIONS: Record<string, UnitStep> = {
+  kg: { to: "g", per: 1000 },
+  l: { to: "cl", per: 100 },
+  dl: { to: "cl", per: 10 },
+  cl: { to: "ml", per: 10 },
+  g: { to: "mg", per: 1000 },
+};
+
+export interface ConvertedAmount {
+  amount: number;
+  unit: UnitInfo;
+}
+
+/**
+ * Move an amount to the unit a cook would actually write it in.
+ *
+ * Promotion happens at a full unit of the next step up, so 999 g stays grams and
+ * 1000 g becomes a kilo. Demotion happens below one, so half a litre reads
+ * "50 cl" rather than "1/2 l". Only one step is taken in each direction, which
+ * covers cooking quantities and keeps the result predictable.
+ *
+ * Rounding to two decimals after conversion keeps the error under a tenth of a
+ * percent, well below what any kitchen scale resolves.
+ */
+export function convertToReadableUnit(unit: UnitInfo, amount: number): ConvertedAmount {
+  if (unit.kind !== "measured" || !Number.isFinite(amount) || amount <= 0) {
+    return { amount, unit };
+  }
+
+  const up = PROMOTIONS[unit.canonical];
+  if (up && amount >= up.per) {
+    const target = lookupUnit(up.to);
+    if (target) return { amount: Math.round((amount / up.per) * 100) / 100, unit: target };
+  }
+
+  const down = DEMOTIONS[unit.canonical];
+  if (down && amount < 1) {
+    const target = lookupUnit(down.to);
+    if (target) return { amount: Math.round(amount * down.per * 100) / 100, unit: target };
+  }
+
+  return { amount, unit };
+}
+
+/**
  * Render a unit for a given amount, choosing singular or plural.
  *
  * French takes the plural from two onwards, so 1,5 stays singular: "1,5 cuillère

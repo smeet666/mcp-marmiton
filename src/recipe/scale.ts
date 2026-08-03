@@ -10,7 +10,7 @@
  */
 
 import { formatAmount, parseIngredient } from "./quantity.js";
-import { formatUnit } from "./units.js";
+import { convertToReadableUnit, formatUnit } from "./units.js";
 
 export type ScalingKind =
   /** Multiplied and rounded to a readable value. */
@@ -25,7 +25,15 @@ export interface ScaledIngredient {
   original: string;
   /** The line after scaling, identical to `original` when unscaled. */
   text: string;
+  /**
+   * The scaled quantity, expressed in `unit`.
+   *
+   * Read it together with `unit`, never on its own: a large result is moved to a
+   * bigger unit, so scaling "200 g" by ten gives an amount of 2 with a unit of
+   * "kg". The bare number can therefore shrink while the quantity grows.
+   */
   amount: number | null;
+  /** The unit `amount` is in, which may differ from the one the recipe used. */
   unit: string | null;
   scaling: ScalingKind;
   /** Why the line was left alone, when it was. */
@@ -152,9 +160,15 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
   const raw = parsed.amount * factor;
   let amount: number;
   let scaling: ScalingKind;
+  let unit = parsed.unit;
 
   if (kind === "measured") {
-    amount = roundMeasured(raw);
+    // Round first, then move up or down the metric ladder, so the value a cook
+    // reads is both correctly rounded and at a human size: 8335 g becomes
+    // 8,34 kg rather than staying eight thousand grams.
+    const converted = convertToReadableUnit(parsed.unit!, roundMeasured(raw));
+    amount = converted.amount;
+    unit = converted.unit;
     scaling = "scaled";
   } else if (kind === "portioned") {
     // Spoons tolerate halves; boxes and sachets do not.
@@ -167,18 +181,21 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
     scaling = "rounded";
   }
 
-  const unitLabel = parsed.unit ? ` ${formatUnit(parsed.unit, amount)}` : "";
-  const separator = parsed.unit ? " de " : " ";
+  const unitLabel = unit ? ` ${formatUnit(unit, amount)}` : "";
+  const separator = unit ? " de " : " ";
   // A countable item agrees with its number: "1/3 oeuf", "3 brioches".
-  const itemText = parsed.unit ? parsed.item : agreeWithAmount(parsed.item, amount);
+  const itemText = unit ? parsed.item : agreeWithAmount(parsed.item, amount);
   const item = itemText ? `${separator}${itemText}` : "";
-  const text = `${formatAmount(amount)}${unitLabel}${item}`.trim();
+  // Mass and volume read as decimals; counted and spooned things read as
+  // fractions.
+  const amountText = formatAmount(amount, { fractions: kind !== "measured" });
+  const text = `${amountText}${unitLabel}${item}`.trim();
 
   const result: ScaledIngredient = {
     original: parsed.original,
     text,
     amount,
-    unit: parsed.unit?.canonical ?? null,
+    unit: unit?.canonical ?? null,
     scaling,
   };
 

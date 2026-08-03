@@ -127,15 +127,28 @@ export function parseIngredient(line: string): ParsedIngredient {
   return { original, amount: quantity.amount, unit, unitText, item };
 }
 
+export interface FormatAmountOptions {
+  /**
+   * Whether to snap near-fractions to 1/4, 1/3, 1/2, 2/3 and 3/4.
+   *
+   * True for things a cook counts or spoons out: "1/3 cuillère" is how a kitchen
+   * expresses it, "0,33 cuillère" is not. False for mass and volume, which are
+   * decimal by nature: nobody weighs "8 1/3 kg" of sugar, they weigh 8,33 kg.
+   */
+  fractions?: boolean;
+}
+
 /**
  * Render an amount the way a recipe would write it.
- *
- * Thirds become fractions because "0.33 cuillère" is not something anyone
- * measures, while everything else stays decimal with at most two places.
  */
-export function formatAmount(amount: number): string {
+export function formatAmount(amount: number, options: FormatAmountOptions = {}): string {
   if (!Number.isFinite(amount)) return "";
   if (Number.isInteger(amount)) return String(amount);
+
+  if (options.fractions === false) {
+    // French recipes write decimals with a comma.
+    return String(Math.round(amount * 100) / 100).replace(".", ",");
+  }
 
   const whole = Math.floor(amount);
   const rest = amount - whole;

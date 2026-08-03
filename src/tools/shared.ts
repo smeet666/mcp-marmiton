@@ -9,8 +9,18 @@ export const MAX_TEXT_MIRROR_CHARS = 2000;
 export const scaledIngredientSchema = z.object({
   original: z.string().describe("The ingredient line exactly as Marmiton publishes it."),
   text: z.string().describe("The line after scaling, identical to 'original' when unscaled."),
-  amount: z.number().nullable(),
-  unit: z.string().nullable(),
+  amount: z
+    .number()
+    .nullable()
+    .describe(
+      "The scaled quantity, expressed in 'unit'. Read the two together: a large result is moved to a " +
+        "bigger unit, so 200 g scaled tenfold reads as 2 kg, and the bare number shrinks while the " +
+        "quantity grows.",
+    ),
+  unit: z
+    .string()
+    .nullable()
+    .describe("The unit 'amount' is in, which may differ from the one the recipe used."),
   scaling: z
     .enum(["scaled", "rounded", "unscaled"])
     .describe(

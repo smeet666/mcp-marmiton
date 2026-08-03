@@ -256,13 +256,29 @@ describe("scaleIngredient — the two rules that matter", () => {
   });
 
   it("scaling up never yields less than the original", () => {
+    // Compared in base units, because a scaled amount may come back in a bigger
+    // unit than it went in: "200 g" times ten is "2 kg", where the bare number
+    // shrinks while the quantity grows.
+    const TO_BASE: Record<string, number> = {
+      mg: 0.001,
+      g: 1,
+      kg: 1000,
+      ml: 1,
+      cl: 10,
+      dl: 100,
+      l: 1000,
+    };
+    const base = (amount: number, unit: string | null) => amount * (TO_BASE[unit ?? ""] ?? 1);
+
     for (const line of FULL_RECIPE) {
-      const before = parseIngredient(line).amount;
-      if (before === null) continue;
+      const parsed = parseIngredient(line);
+      if (parsed.amount === null) continue;
+      const before = base(parsed.amount, parsed.unit?.canonical ?? null);
+
       for (const factor of [1.1, 1.5, 2, 3, 10]) {
         const r = scaleIngredient(line, { factor });
         if (r.scaling === "unscaled") continue;
-        expect(r.amount!, `${line} x ${factor}`).toBeGreaterThanOrEqual(before);
+        expect(base(r.amount!, r.unit), `${line} x ${factor}`).toBeGreaterThanOrEqual(before);
       }
     }
   });
@@ -383,5 +399,90 @@ describe("passthroughIngredients", () => {
 
   it("handles an empty list", () => {
     expect(passthroughIngredients([])).toEqual([]);
+  });
+});
+
+describe("scaleIngredient — a scaled amount stays at a human size", () => {
+  it("climbs to kilos past a thousand grams", () => {
+    // A canteen factor is where this shows: 250 g x 33.33 is correct as 8335 g
+    // and unusable. Every earlier test used a factor between 0.1 and 3, which is
+    // why the gap went unnoticed.
+    const r = scaleIngredient("250 g de sucre en poudre", { factor: 100 / 3 });
+    expect(r.unit).toBe("kg");
+    expect(r.amount).toBeGreaterThan(8);
+    expect(r.amount).toBeLessThan(8.5);
+    expect(r.text).toContain("kg de sucre en poudre");
+    expect(r.text).not.toMatch(/\d{4}/);
+  });
+
+  it("climbs to litres past a hundred centilitres", () => {
+    const r = scaleIngredient("5 cl de liqueur d'orange", { factor: 100 / 3 });
+    expect(r.unit).toBe("l");
+    expect(r.amount).toBeCloseTo(1.65, 2);
+  });
+
+  it("stays put just below the promotion threshold", () => {
+    // 990 g is still grams; the ladder must not fire early. Note that 999 g
+    // would legitimately promote, because rounding to a 5 step lands it on
+    // 1000 g before the ladder is consulted.
+    expect(scaleIngredient("990 g de farine", { factor: 1 }).unit).toBe("g");
+    expect(scaleIngredient("99 cl de lait", { factor: 1 }).unit).toBe("cl");
+  });
+
+  it("promotes exactly at the threshold", () => {
+    expect(scaleIngredient("500 g de farine", { factor: 2 }).unit).toBe("kg");
+    expect(scaleIngredient("50 cl de lait", { factor: 2 }).unit).toBe("l");
+  });
+
+  it("comes back down below one unit", () => {
+    // Half a litre reads better as 50 cl than as "1/2 l".
+    const r = scaleIngredient("1 l de lait", { factor: 0.5 });
+    expect(r.unit).toBe("cl");
+    expect(r.amount).toBe(50);
+
+    const k = scaleIngredient("1 kg de farine", { factor: 0.25 });
+    expect(k.unit).toBe("g");
+    expect(k.amount).toBe(250);
+  });
+
+  it("keeps the conversion faithful to the rounded amount", () => {
+    // The promoted value must describe the same quantity, within the rounding
+    // the kitchen scale would apply anyway.
+    const r = scaleIngredient("50 g de maïzena", { factor: 100 / 3 });
+    const grams = (r.amount ?? 0) * 1000;
+    expect(Math.abs(grams - 50 * (100 / 3))).toBeLessThan(20);
+  });
+
+  it("leaves countable and vague units off the ladder", () => {
+    // Only mass and volume have a metric ladder; 2000 sachets stay sachets.
+    expect(scaleIngredient("2 sachets de levure", { factor: 1000 }).unit).toBe("sachet");
+    expect(scaleIngredient("1 pincée de sel", { factor: 1000 }).scaling).toBe("unscaled");
+  });
+});
+
+describe("scaleIngredient — mass and volume read as decimals, not fractions", () => {
+  it("writes a promoted mass as a decimal", () => {
+    // "8 1/3 kg de sucre" is not how anyone weighs sugar. Fractions belong to
+    // things a cook counts or spoons out, not to a scale reading.
+    const r = scaleIngredient("250 g de sucre", { factor: 100 / 3 });
+    expect(r.text).not.toMatch(/\d\/\d/);
+    expect(r.text).toMatch(/^8,3\d? kg de sucre$/);
+  });
+
+  it("writes a promoted volume as a decimal", () => {
+    const r = scaleIngredient("5 cl de liqueur", { factor: 100 / 3 });
+    expect(r.text).not.toMatch(/\d\/\d/);
+    expect(r.text).toMatch(/^1,6\d? l de liqueur$/);
+  });
+
+  it("writes a half unit of volume as a decimal", () => {
+    expect(scaleIngredient("3 cl de rhum", { factor: 0.5 }).text).toBe("1,5 cl de rhum");
+  });
+
+  it("still uses fractions for counted and spooned things", () => {
+    expect(scaleIngredient("2 cuillères à soupe de sucre", { factor: 0.667 }).text).toContain(
+      "1/2",
+    );
+    expect(scaleIngredient("3 oeufs", { factor: 0.1 }).text).toContain("1/3");
   });
 });
