@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.3
+
+- Refresh the packaged README, which now carries one-click install links for
+  Cursor and VS Code and a link to the entry in the official MCP registry.
+- Keep LICENSE to the plain MIT text. License detectors match the file against
+  the canonical template, so the trailing scope note made the package read as
+  unlicensed; that note lives in the README. It also described lyrics rather
+  than recipes.
+
 ## 1.0.2
 
 - Keep a scaled mass or volume at a human size. Multiplying a recipe for a
