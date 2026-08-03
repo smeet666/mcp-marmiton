@@ -3,6 +3,7 @@
 [![npm](https://img.shields.io/npm/v/mcp-marmiton.svg)](https://www.npmjs.com/package/mcp-marmiton)
 [![CI](https://github.com/smeet666/mcp-marmiton/actions/workflows/ci.yml/badge.svg)](https://github.com/smeet666/mcp-marmiton/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/mcp-marmiton.svg)](./LICENSE)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-listed-6E56CF)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.smeet666/mcp-marmiton)
 
 An [MCP](https://modelcontextprotocol.io) server for [Marmiton](https://www.marmiton.org),
 the French recipe site. Search recipes, read their ingredients and steps, and
@@ -14,6 +15,11 @@ _(Version française plus bas / [French version below](#mcp-marmiton-français))
 ---
 
 ## Quickstart
+
+**One-click install**
+
+[![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=marmiton&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIm1jcC1tYXJtaXRvbiJdfQ%3D%3D)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install-0098FF?style=flat&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=marmiton&config=%7B%22name%22%3A%22marmiton%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22mcp-marmiton%22%5D%7D)
 
 **Claude Code**
 
@@ -167,6 +173,11 @@ Cherchez des recettes, lisez leurs ingrédients et leurs étapes, et **adaptez l
 quantités au nombre de convives**. **Sans clé d'API, sans compte, sans configuration.**
 
 ## Démarrage rapide
+
+**Installation en un clic**
+
+[![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=marmiton&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIm1jcC1tYXJtaXRvbiJdfQ%3D%3D)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install-0098FF?style=flat&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=marmiton&config=%7B%22name%22%3A%22marmiton%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22mcp-marmiton%22%5D%7D)
 
 **Claude Code**
 
