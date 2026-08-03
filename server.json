@@ -1,7 +1,7 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.smeet666/mcp-marmiton",
-  "description": "Search Marmiton recipes, read ingredients and steps, and scale quantities to any number of servings. No API key.",
+  "description": "Search Marmiton recipes, read ingredients and steps, and scale quantities to any servings.",
   "repository": {
     "url": "https://github.com/smeet666/mcp-marmiton",
     "source": "github"
