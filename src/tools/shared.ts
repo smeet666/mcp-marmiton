@@ -1,0 +1,58 @@
+/** Pieces shared by the three tools: schemas, error mapping, text mirrors. */
+
+import { z } from "zod";
+import { MarmitonError } from "../errors.js";
+
+/** Many MCP clients render only the text block, so it must read on its own. */
+export const MAX_TEXT_MIRROR_CHARS = 2000;
+
+export const scaledIngredientSchema = z.object({
+  original: z.string().describe("The ingredient line exactly as Marmiton publishes it."),
+  text: z.string().describe("The line after scaling, identical to 'original' when unscaled."),
+  amount: z.number().nullable(),
+  unit: z.string().nullable(),
+  scaling: z
+    .enum(["scaled", "rounded", "unscaled"])
+    .describe(
+      "'scaled' was multiplied cleanly. 'rounded' was multiplied then rounded to something countable. " +
+        "'unscaled' was left alone, either because it carries no quantity or because the measure is " +
+        "approximate by nature.",
+    ),
+  note: z.string().optional().describe("Why the line was rounded or left alone."),
+});
+
+export interface ToolResult {
+  // The SDK's CallToolResult carries an index signature for protocol extensions.
+  [key: string]: unknown;
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent?: Record<string, unknown>;
+  isError?: boolean;
+}
+
+export function ok(structured: Record<string, unknown>, text: string): ToolResult {
+  return {
+    content: [{ type: "text", text: truncate(text, MAX_TEXT_MIRROR_CHARS) }],
+    structuredContent: structured,
+  };
+}
+
+/**
+ * Error results carry no structuredContent: the SDK validates it against the
+ * tool's declared output schema, which an error payload does not satisfy.
+ */
+export function toToolError(error: unknown): ToolResult {
+  const known =
+    error instanceof MarmitonError
+      ? error
+      : new MarmitonError("network_error", error instanceof Error ? error.message : String(error));
+
+  const lines = [`[${known.code}] ${known.message}`];
+  if (known.details.hint) lines.push(`Hint: ${known.details.hint}`);
+
+  return { content: [{ type: "text", text: lines.join("\n") }], isError: true };
+}
+
+export function truncate(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars - 1).trimEnd()}…`;
+}

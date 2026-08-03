@@ -1,0 +1,35 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.smeet666/mcp-marmiton",
+  "description": "Search Marmiton recipes, read ingredients and steps, and scale quantities to any number of servings. No API key.",
+  "repository": {
+    "url": "https://github.com/smeet666/mcp-marmiton",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "mcp-marmiton",
+      "version": "0.1.0",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "MARMITON_USER_AGENT",
+          "description": "Override the User-Agent sent to Marmiton.",
+          "isRequired": false
+        },
+        {
+          "name": "MARMITON_MIN_INTERVAL_MS",
+          "description": "Minimum milliseconds between requests. Default 1000, floor 500.",
+          "isRequired": false
+        },
+        {
+          "name": "MARMITON_LOG_LEVEL",
+          "description": "silent, error, info or debug. Default error.",
+          "isRequired": false
+        }
+      ]
+    }
+  ]
+}
