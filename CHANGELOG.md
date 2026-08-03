@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1
+
+- Make a counted ingredient agree with its amount when scaling **up**, not only
+  when scaling down. Tripling a recipe returned "3 brioche" and "3 orange"
+  alongside a correct "30 oeufs", because the agreement helper only knew how to
+  remove a plural mark. Nouns that take no plural mark, and those whose singular
+  already ends in -s, are still left untouched.
+
 ## 1.0.0
 
 First stable release. The tool contracts are settled: tool names, their parameters

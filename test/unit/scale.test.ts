@@ -157,6 +157,49 @@ describe("scaleIngredient — portioned units tolerate halves only where a cook 
   });
 });
 
+describe("scaleIngredient — a counted item agrees with its amount both ways", () => {
+  it("adds the plural mark when scaling up", () => {
+    // Scaling only ever removed an "s", never added one, so tripling a recipe
+    // produced "3 brioche" next to "30 oeufs" in the same list.
+    expect(scaleIngredient("1 brioche", { factor: 3 }).text).toBe("3 brioches");
+    expect(scaleIngredient("1 orange", { factor: 3 }).text).toBe("3 oranges");
+    expect(scaleIngredient("1 pomme Golden", { factor: 4 }).text).toBe("4 pommes Golden");
+  });
+
+  it("removes the plural mark when scaling down", () => {
+    expect(scaleIngredient("6 pommes", { factor: 1 / 6 }).text).toBe("1 pomme");
+    expect(scaleIngredient("3 oeufs", { factor: 1 / 3 }).text).toBe("1 oeuf");
+  });
+
+  it("keeps a plural already correct and a singular already correct", () => {
+    expect(scaleIngredient("2 citrons", { factor: 2 }).text).toBe("4 citrons");
+    expect(scaleIngredient("1 citron", { factor: 1 }).text).toBe("1 citron");
+  });
+
+  it("uses the singular below one, where French does", () => {
+    // 3 x 0.1 = 0.3, whose nearest usable fraction is a third.
+    expect(scaleIngredient("3 oeufs", { factor: 0.1 }).text).toBe("1/3 oeuf");
+    expect(scaleIngredient("1 brioche", { factor: 0.5 }).text).toBe("1/2 brioche");
+  });
+
+  it("leaves invariable nouns alone in both directions", () => {
+    // Nouns ending in -s, -x or -z take no plural mark, and those whose singular
+    // already ends in -s must not lose it. A wrong form is worse than an
+    // unchanged one, since the reader cannot tell it was computed.
+    expect(scaleIngredient("1 ananas", { factor: 3 }).text).toBe("3 ananas");
+    expect(scaleIngredient("2 ananas", { factor: 0.5 }).text).toBe("1 ananas");
+    expect(scaleIngredient("1 chou", { factor: 2 }).text).toBe("2 chous");
+    expect(scaleIngredient("1 choux", { factor: 2 }).text).toBe("2 choux");
+  });
+
+  it("never touches the item when a unit carries the count", () => {
+    // "3 g de farine" tripled is "9 g de farine": the noun follows the unit, not
+    // the number, so agreement must not be applied to it.
+    expect(scaleIngredient("100 g de pommes", { factor: 3 }).text).toBe("300 g de pommes");
+    expect(scaleIngredient("200 g de farine", { factor: 0.5 }).text).toBe("100 g de farine");
+  });
+});
+
 describe("scaleIngredient — vague and amountless lines are left alone", () => {
   it("returns a vague amount byte-identical", () => {
     const line = "1 pincée de sel";

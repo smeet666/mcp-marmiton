@@ -83,21 +83,34 @@ export interface ScaleOptions {
 }
 
 /**
- * Drop a plural "s" from a counted item when the amount no longer warrants it.
+ * Make a counted item agree with its amount, in both directions.
  *
- * French takes the plural from two onwards, so "2 oeufs" halved reads "1 oeuf".
- * Only a trailing "s" is touched, and words that legitimately end in -as, -is,
- * -os or -us ("ananas", "anis") are left alone: a wrong singular would be worse
- * than an unchanged plural.
+ * French takes the plural from two onwards, so "2 oeufs" halved reads "1 oeuf"
+ * and "1 brioche" tripled reads "3 brioches". Only the head word is touched, and
+ * only its trailing "s": nouns already ending in -s, -x or -z are invariable in
+ * the plural ("ananas", "choux"), and forcing one would be worse than leaving the
+ * word as the recipe wrote it.
  */
-function singularizeIfNeeded(item: string, amount: number): string {
-  if (amount >= 2 || !item) return item;
+function agreeWithAmount(item: string, amount: number): string {
+  if (!item) return item;
 
   const words = item.split(" ");
-  const first = words[0] ?? "";
-  if (first.length > 3 && /s$/i.test(first) && !/[aiou]s$/i.test(first)) {
-    words[0] = first.slice(0, -1);
+  const head = words[0] ?? "";
+  if (head.length <= 3) return item;
+
+  const wantsPlural = amount >= 2;
+  const isPlural = /s$/i.test(head);
+
+  if (wantsPlural && !isPlural) {
+    // Words ending in -s, -x or -z do not take a plural mark.
+    if (/[sxz]$/i.test(head)) return item;
+    words[0] = `${head}s`;
+  } else if (!wantsPlural && isPlural) {
+    // "ananas", "anis", "couscous": the -s belongs to the singular.
+    if (/[aiou]s$/i.test(head)) return item;
+    words[0] = head.slice(0, -1);
   }
+
   return words.join(" ");
 }
 
@@ -156,8 +169,8 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
 
   const unitLabel = parsed.unit ? ` ${formatUnit(parsed.unit, amount)}` : "";
   const separator = parsed.unit ? " de " : " ";
-  // A countable item agrees with its number: "1/3 oeuf", not "1/3 oeufs".
-  const itemText = parsed.unit ? parsed.item : singularizeIfNeeded(parsed.item, amount);
+  // A countable item agrees with its number: "1/3 oeuf", "3 brioches".
+  const itemText = parsed.unit ? parsed.item : agreeWithAmount(parsed.item, amount);
   const item = itemText ? `${separator}${itemText}` : "";
   const text = `${formatAmount(amount)}${unitLabel}${item}`.trim();
 
