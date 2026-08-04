@@ -40,6 +40,14 @@ claude mcp add marmiton -- npx -y mcp-marmiton
 }
 ```
 
+**Bundle, without npm**
+
+Download `mcp-marmiton-<version>.mcpb` from
+[the latest release](https://github.com/smeet666/mcp-marmiton/releases/latest) and open
+it. A client that supports MCP bundles installs it on its own, with no npm and
+no configuration file to edit. The bundle carries its dependencies, so nothing
+is fetched at install time.
+
 ## Tools
 
 | Tool                | What it does                           | Key parameters                                          |
@@ -73,6 +81,11 @@ which is why small amounts come back as fractions.
 
 Ranges are read as one quantity: "2 à 3 gousses" doubled reads "4 à 6 gousses",
 and `amount` reports the upper bound, since that is what a cook buys.
+
+Each ingredient also carries `adjusted`, which says whether rounding actually
+moved the number. A line can be `rounded` and still land exactly, as three eggs
+doubled land on six, so read `adjusted` rather than the flag when what you want
+to know is whether a quantity was touched.
 
 Below a quarter there is nothing a kitchen can measure, so the amount is clamped
 up and **the line stops holding its share of the recipe**. Half a sachet of
@@ -220,6 +233,14 @@ claude mcp add marmiton -- npx -y mcp-marmiton
 }
 ```
 
+**Bundle, sans npm**
+
+Téléchargez `mcp-marmiton-<version>.mcpb` depuis
+[la dernière release](https://github.com/smeet666/mcp-marmiton/releases/latest) et
+ouvrez-le. Un client compatible avec les bundles MCP l'installe seul, sans npm
+ni fichier de configuration à modifier. Le bundle embarque ses dépendances,
+donc rien n'est téléchargé à l'installation.
+
 ## Outils
 
 | Outil               | Rôle                                        | Paramètres principaux                                   |
@@ -254,6 +275,11 @@ sachet entier. Et l'adaptation ne **supprime jamais** un ingrédient en l'arrond
 Les fourchettes sont lues comme une seule quantité : « 2 à 3 gousses » doublé
 donne « 4 à 6 gousses », et `amount` renvoie la borne haute, celle que l'on
 achète.
+
+Chaque ingrédient porte aussi `adjusted`, qui dit si l'arrondi a réellement
+déplacé le nombre. Une ligne peut être `rounded` et tomber juste, comme trois
+œufs doublés qui font six, donc lisez `adjusted` plutôt que l'indicateur quand
+la question est de savoir si une quantité a été touchée.
 
 Sous un quart, il n'y a plus rien qu'une cuisine puisse mesurer : la quantité est
 alors remontée et **la ligne cesse de tenir sa part de la recette**. Un demi-sachet
