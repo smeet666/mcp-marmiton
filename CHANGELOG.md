@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.1
+
+Housekeeping, with no change to what any tool returns.
+
+- Declare the tool schemas as objects rather than as the raw shape the SDK now
+  deprecates. The emitted `tools/list` is byte for byte what it was.
+- Add an icon and a `websiteUrl` to `server.json`, so the registry has something
+  to show next to the entry.
+- `scale_ingredients` no longer claims an open world. It does arithmetic on the
+  arguments it was handed and contacts nothing, so the same list and the same
+  factor give the same answer whatever Marmiton publishes.
+
 ## 1.2.0
 
 Quantities that were arithmetically right and uncookable, which is a wrong

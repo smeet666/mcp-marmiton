@@ -6,6 +6,7 @@
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
 import type { Config, Logger } from "./config.js";
 import { createLogger, loadConfig } from "./config.js";
 import { MarmitonClient } from "./marmiton/client.js";
@@ -46,6 +47,13 @@ const READ_ONLY = {
   openWorldHint: true,
 } as const;
 
+/**
+ * scale_ingredients does arithmetic on the arguments it was handed and contacts
+ * nothing, so its world is closed: the same list and the same factor give the
+ * same answer forever, whatever Marmiton publishes.
+ */
+const OFFLINE = { ...READ_ONLY, openWorldHint: false } as const;
+
 export function createServer(options: CreateServerOptions = {}): McpServer {
   const config = options.config ?? loadConfig();
   const logger = options.logger ?? createLogger(config.logLevel);
@@ -74,8 +82,8 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
     {
       title: "Search recipes",
       description: searchRecipesDescription,
-      inputSchema: searchRecipesInputShape,
-      outputSchema: searchRecipesOutputShape,
+      inputSchema: z.object(searchRecipesInputShape),
+      outputSchema: z.object(searchRecipesOutputShape),
       annotations: READ_ONLY,
     },
     async (args) => runSearchRecipes(client, args as SearchRecipesArgs),
@@ -86,8 +94,8 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
     {
       title: "Get a recipe",
       description: getRecipeDescription,
-      inputSchema: getRecipeInputShape,
-      outputSchema: getRecipeOutputShape,
+      inputSchema: z.object(getRecipeInputShape),
+      outputSchema: z.object(getRecipeOutputShape),
       annotations: READ_ONLY,
     },
     async (args) => runGetRecipe(client, args as GetRecipeArgs),
@@ -98,9 +106,9 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
     {
       title: "Scale an ingredient list",
       description: scaleIngredientsDescription,
-      inputSchema: scaleIngredientsInputShape,
-      outputSchema: scaleIngredientsOutputShape,
-      annotations: READ_ONLY,
+      inputSchema: z.object(scaleIngredientsInputShape),
+      outputSchema: z.object(scaleIngredientsOutputShape),
+      annotations: OFFLINE,
     },
     async (args) => runScaleIngredients(args as ScaleIngredientsArgs),
   );
