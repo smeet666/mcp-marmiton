@@ -58,14 +58,14 @@ export class MarmitonClient {
   private readonly config: Config;
   private readonly logger: Logger;
   private readonly limiter: RateLimiter;
-  private readonly cache: TtlLruCache<string>;
+  private readonly cache: TtlLruCache<unknown>;
   private readonly fetchImpl: typeof fetch | undefined;
 
   constructor(options: MarmitonClientOptions = {}) {
     this.config = withGuarantees(options.config ?? loadConfig());
     this.logger = options.logger ?? createLogger(this.config.logLevel);
     this.limiter = new RateLimiter({ minIntervalMs: this.config.minIntervalMs });
-    this.cache = new TtlLruCache<string>(this.config.cacheMaxEntries, this.config.cacheTtlMs);
+    this.cache = new TtlLruCache<unknown>(this.config.cacheMaxEntries, this.config.cacheTtlMs);
     this.fetchImpl = options.fetchImpl;
   }
 
@@ -77,21 +77,28 @@ export class MarmitonClient {
    */
   async search(query: string): Promise<Outcome<RecipeSummary[]>> {
     const url = buildSearchUrl(query);
-    const { html, cached } = await this.fetchPage(url);
-    return { data: parseSearchPage(html, url), cached };
+    return this.fetchParsed(url, (html) => parseSearchPage(html, url));
   }
 
   async getRecipe(ref: { id?: string; url?: string }): Promise<Outcome<Recipe>> {
     const { id, url } = resolveRecipeRef(ref);
-    const { html, cached } = await this.fetchPage(url);
-    return { data: parseRecipePage(html, { id, url }), cached };
+    return this.fetchParsed(url, (html) => parseRecipePage(html, { id, url }));
   }
 
-  private async fetchPage(url: string): Promise<{ html: string; cached: boolean }> {
+  /**
+   * Fetch, parse, then cache. In that order: a page that could not be read is
+   * never stored, so a bad minute at Marmiton cannot be replayed from memory for
+   * the rest of the cache lifetime, leaving the tool unable to recover after
+   * the site comes back.
+   *
+   * The cached value is the parsed result rather than the raw page, which also
+   * keeps a few hundred kilobytes of markup per entry out of memory.
+   */
+  private async fetchParsed<T>(url: string, parse: (html: string) => T): Promise<Outcome<T>> {
     const hit = this.cache.get(url);
     if (hit !== undefined) {
       this.logger.debug(`cache hit ${url}`);
-      return { html: hit, cached: true };
+      return { data: hit as T, cached: true };
     }
 
     const html = await fetchHtml(url, {
@@ -100,7 +107,9 @@ export class MarmitonClient {
       logger: this.logger,
       ...(this.fetchImpl ? { fetchImpl: this.fetchImpl } : {}),
     });
-    this.cache.set(url, html);
-    return { html, cached: false };
+
+    const data = parse(html);
+    this.cache.set(url, data);
+    return { data, cached: false };
   }
 }
