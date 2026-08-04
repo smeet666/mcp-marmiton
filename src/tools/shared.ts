@@ -28,7 +28,13 @@ export const scaledIngredientSchema = z.object({
         "'unscaled' was left alone, either because it carries no quantity or because the measure is " +
         "approximate by nature.",
     ),
-  note: z.string().optional().describe("Why the line was rounded or left alone."),
+  adjusted: z
+    .boolean()
+    .describe(
+      "True when rounding moved the value away from the exact product. A line can be 'rounded' and " +
+        "still land exactly, as three eggs doubled land on six.",
+    ),
+  note: z.string().optional().describe("Why the line was rounded, clamped or left alone."),
 });
 
 export interface ToolResult {
@@ -39,9 +45,29 @@ export interface ToolResult {
   isError?: boolean;
 }
 
-export function ok(structured: Record<string, unknown>, text: string): ToolResult {
+/**
+ * Build a result whose text block ends with the notes.
+ *
+ * The notes are what qualifies the answer: that a quantity was clamped and no
+ * longer holds its share, that the nutrition figures describe the recipe as
+ * published rather than the amounts printed above them, that two ways of asking
+ * for the same thing disagreed. A client rendering only the text read the
+ * unqualified answer without them.
+ *
+ * They are appended after the body is trimmed, so they survive a long
+ * ingredient list.
+ */
+export function ok(
+  structured: Record<string, unknown>,
+  text: string,
+  notes: string[] = [],
+): ToolResult {
+  const trailer = notes.map((note) => `Note: ${note}`).join("\n");
+  const budget = MAX_TEXT_MIRROR_CHARS - (trailer ? trailer.length + 2 : 0);
+  const body = truncate(text, Math.max(0, budget));
+
   return {
-    content: [{ type: "text", text: truncate(text, MAX_TEXT_MIRROR_CHARS) }],
+    content: [{ type: "text", text: trailer ? `${body}\n\n${trailer}` : body }],
     structuredContent: structured,
   };
 }

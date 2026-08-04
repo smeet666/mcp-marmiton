@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.2.0
+
+Quantities that were arithmetically right and uncookable, which is a wrong
+answer here because the caller acts on it.
+
+- Scale both ends of a range. "2 à 3 gousses" doubled returned "4 à 3", an
+  inverted range, and shrunk it returned "2/3 à 3", a line still asking for
+  three cloves when the whole point was to ask for fewer. Ranges written with
+  "à", "ou" or a dash are read as one quantity and scaled together, and the
+  upper bound is what `amount` reports, since that is what a cook buys.
+- Round a countable item back to a whole one. One egg times 0.9 answered "3/4
+  oeuf", and three eggs times 0.33 did the same, because a whole was not among
+  the values below one that a fraction could snap to. It is now, with a ceiling
+  that keeps a shrunk recipe from ever asking for more than the original.
+- Say when a quantity was clamped. Below a quarter there is nothing a kitchen
+  can measure, so the amount is clamped up, and that line no longer holds its
+  share of the recipe: half a sachet of baking powder against three pots of
+  flour comes out four times too strong. The line and the response now both say
+  so instead of leaving the caller to discover it in the oven.
+- Convert before rounding, not after. A kilo divided by a thousand rounded to
+  "0 kg", stating the recipe needs none of it, and a quarter of a millilitre
+  came back three tenths, a fifth too much. Every rounding now happens in a unit
+  large enough to survive it.
+- Count the quantities that were actually moved. Every response claimed the same
+  number of roundings whatever the factor, including factors where every result
+  landed exact. Each ingredient carries `adjusted` for the same question.
+- Carry the steps and the notes into the text block. A client rendering only
+  text got a recipe with no cooking steps, no warning that the numbers had been
+  rounded, and calorie figures with nothing to say they describe the recipe as
+  published rather than the amounts printed above them.
+- Stop labelling every line "(non ajusté)" when no rescaling was requested. The
+  flag answers "why is this unchanged", which is only a question when something
+  was meant to change.
+- Say when `factor` and the `from_servings`/`to_servings` pair are both given.
+  The factor won silently, so a caller asking for 4 to 12 could be served a
+  different multiplier without being told.
+- Print the factor that was applied. `factor: 0.001` was shown as "Facteur 0",
+  which states that nothing was applied to quantities divided by a thousand.
+- Write "25 pots" rather than "25 pot", and "d'huile" rather than "de huile".
+
 ## 1.1.0
 
 - Cache a response only once it has been read successfully. The cache stored

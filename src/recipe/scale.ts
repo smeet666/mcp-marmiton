@@ -10,7 +10,8 @@
  */
 
 import { formatAmount, parseIngredient } from "./quantity.js";
-import { convertToReadableUnit, formatUnit } from "./units.js";
+import type { UnitInfo } from "./units.js";
+import { convertToReadableUnit, demoteUnit, formatUnit } from "./units.js";
 
 export type ScalingKind =
   /** Multiplied and rounded to a readable value. */
@@ -36,6 +37,14 @@ export interface ScaledIngredient {
   /** The unit `amount` is in, which may differ from the one the recipe used. */
   unit: string | null;
   scaling: ScalingKind;
+  /**
+   * Whether rounding moved the value away from the exact product.
+   *
+   * Read this rather than `scaling` to know if a number was touched: a line can
+   * be classified `rounded` and still land on the exact result, as three eggs
+   * doubled land on six.
+   */
+  adjusted: boolean;
   /** Why the line was left alone, when it was. */
   note?: string;
 }
@@ -58,31 +67,78 @@ function roundMeasured(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** Below this there is nothing a kitchen can measure out of a countable thing. */
+const SMALLEST_USABLE_FRACTION = 0.25;
+
+interface CountableResult {
+  value: number;
+  /** The floor was hit, so this line no longer holds its share of the recipe. */
+  clamped: boolean;
+}
+
 /**
  * Round a countable amount to something a cook can act on.
  *
- * Below one whole unit the amount is kept as a fraction rather than rounded to a
- * whole: rounding 1/3 of a sachet up to 1 would make a recipe scaled *down* call
- * for *more* than the original, which is worse than any fraction. Rounding it
- * down to zero would silently delete the ingredient, which is worse still.
+ * Below one whole unit the amount snaps to a fraction a kitchen can measure: a
+ * raw 0,15 of an egg is no more usable than zero. One whole is among the
+ * candidates, so an egg shrunk to 0,9 comes back as one egg rather than three
+ * quarters of one, and the ceiling stops that from ever asking for more than
+ * the recipe started with.
+ *
+ * A quarter is the floor. Under it the amount is clamped up rather than shrunk
+ * towards nothing, which keeps the ingredient in the recipe at the cost of its
+ * proportion, and the caller is told through `clamped`.
  */
-function roundCountable(value: number, allowHalves: boolean): number {
-  if (value <= 0) return 0;
+function roundCountable(value: number, allowHalves: boolean, ceiling: number): CountableResult {
+  if (value <= 0) return { value: 0, clamped: false };
 
   if (value < 1) {
-    // Snap to a fraction a cook can act on. A raw decimal such as 0,15 is no
-    // more usable than zero: nobody measures fifteen hundredths of an egg. A
-    // quarter is the smallest fraction worth printing, so anything under it is
-    // clamped up rather than shrinking towards nothing.
-    const USABLE_FRACTIONS = [0.25, 1 / 3, 0.5, 2 / 3, 0.75];
-    let closest = USABLE_FRACTIONS[0]!;
-    for (const fraction of USABLE_FRACTIONS) {
-      if (Math.abs(value - fraction) < Math.abs(value - closest)) closest = fraction;
+    const candidates = [SMALLEST_USABLE_FRACTION, 1 / 3, 0.5, 2 / 3, 0.75, 1].filter(
+      (candidate) => candidate <= Math.max(ceiling, SMALLEST_USABLE_FRACTION),
+    );
+    let closest = candidates[0]!;
+    for (const candidate of candidates) {
+      if (Math.abs(value - candidate) < Math.abs(value - closest)) closest = candidate;
     }
-    return Math.round(closest * 100) / 100;
+    return {
+      value: Math.round(closest * 100) / 100,
+      clamped: value < SMALLEST_USABLE_FRACTION,
+    };
   }
 
-  return allowHalves ? roundTo(value, 0.5) : Math.round(value);
+  return { value: allowHalves ? roundTo(value, 0.5) : Math.round(value), clamped: false };
+}
+
+/**
+ * Round a measured amount in the smallest unit that still holds it whole.
+ *
+ * Rounding before converting throws away the precision the conversion was going
+ * to need: a kilo divided by a thousand rounds to zero kilos, stating that the
+ * recipe needs none of it, and a quarter of a millilitre rounded in centilitres
+ * first comes back three tenths too large. Walking down the ladder first means
+ * every rounding happens on a number big enough to survive it.
+ */
+function roundMeasuredInUsableUnit(
+  unit: UnitInfo,
+  raw: number,
+): { amount: number; unit: UnitInfo } {
+  let current = unit;
+  let value = raw;
+
+  while (value > 0 && value < 1) {
+    const step = demoteUnit(current);
+    if (!step) break;
+    value *= step.per;
+    current = step.unit;
+  }
+
+  const rounded = roundMeasured(value);
+  // At the bottom of the ladder, keep what precision is left rather than
+  // deleting the ingredient.
+  return {
+    amount: rounded === 0 && value > 0 ? Number(value.toPrecision(2)) : rounded,
+    unit: current,
+  };
 }
 
 export interface ScaleOptions {
@@ -129,6 +185,29 @@ function agreeWithAmount(item: string, amount: number): string {
  * than being reported as fractions, and vague measures such as pinches are
  * returned untouched with a note.
  */
+/**
+ * "de" becomes "d'" before a vowel sound.
+ *
+ * The h is the hard case: it is silent in "huile" and sounded in "haricot", and
+ * only a word list separates them. Elision is therefore limited to vowels plus
+ * the handful of h-words a recipe actually uses, because "de haricots" merely
+ * reads as careless while "d'haricots" reads as wrong.
+ */
+const MUTE_H_WORDS = /^(?:huile|huiles|huitre|huitres|huître|huîtres|herbe|herbes|hysope)\b/i;
+
+function joinItem(item: string): string {
+  if (!item) return "";
+  const elides = /^[aeiouàâäéèêëîïôöûü]/i.test(item) || MUTE_H_WORDS.test(item);
+  return elides ? ` d'${item}` : ` de ${item}`;
+}
+
+/**
+ * Scale one ingredient line.
+ *
+ * Countable items are rounded to something a kitchen can measure, ranges are
+ * scaled at both ends, and vague measures such as pinches are returned
+ * untouched with a note.
+ */
 export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngredient {
   const { factor } = options;
   const parsed = parseIngredient(line);
@@ -140,6 +219,7 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
       amount: null,
       unit: null,
       scaling: "unscaled",
+      adjusted: false,
       note: "No quantity given; adjust to taste.",
     };
   }
@@ -153,43 +233,57 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
       amount: parsed.amount,
       unit: parsed.unit?.canonical ?? null,
       scaling: "unscaled",
+      adjusted: false,
       note: "Measure is approximate by nature; adjust to taste.",
     };
   }
 
-  const raw = parsed.amount * factor;
-  let amount: number;
-  let scaling: ScalingKind;
-  let unit = parsed.unit;
+  /** Scale one bound, keeping it at or below what the recipe already asked for. */
+  const scaleBound = (source: number) => {
+    const raw = source * factor;
 
-  if (kind === "measured") {
-    // Round first, then move up or down the metric ladder, so the value a cook
-    // reads is both correctly rounded and at a human size: 8335 g becomes
-    // 8,34 kg rather than staying eight thousand grams.
-    const converted = convertToReadableUnit(parsed.unit!, roundMeasured(raw));
-    amount = converted.amount;
-    unit = converted.unit;
-    scaling = "scaled";
-  } else if (kind === "portioned") {
-    // Spoons tolerate halves; boxes and sachets do not.
+    if (kind === "measured") {
+      const converted = roundMeasuredInUsableUnit(parsed.unit!, raw);
+      const readable = convertToReadableUnit(converted.unit, converted.amount);
+      return { amount: readable.amount, unit: readable.unit, raw, clamped: false };
+    }
+
+    // Spoons tolerate halves; boxes, sachets and eggs do not.
     const allowHalves = /cuillère|verre|tasse|bol/.test(parsed.unit?.canonical ?? "");
-    amount = roundCountable(raw, allowHalves);
-    scaling = "rounded";
-  } else {
-    // Countable item with no unit: "3 oeufs", "2 tomates".
-    amount = roundCountable(raw, false);
-    scaling = "rounded";
-  }
+    // Scaling down must never end up asking for more than the original.
+    const ceiling = factor < 1 ? source : Number.POSITIVE_INFINITY;
+    const rounded = roundCountable(raw, allowHalves, ceiling);
+    return { amount: rounded.value, unit: parsed.unit, raw, clamped: rounded.clamped };
+  };
+
+  const low = scaleBound(parsed.amount);
+  const high = parsed.amountMax === null ? null : scaleBound(parsed.amountMax);
+
+  // A range is reported by its upper bound: that is what a cook buys, and half
+  // a range in `amount` would be read as the whole answer.
+  const amount = high?.amount ?? low.amount;
+  const unit = high?.unit ?? low.unit;
+  const scaling: ScalingKind = kind === "measured" ? "scaled" : "rounded";
 
   const unitLabel = unit ? ` ${formatUnit(unit, amount)}` : "";
-  const separator = unit ? " de " : " ";
-  // A countable item agrees with its number: "1/3 oeuf", "3 brioches".
+  // A counted item agrees with its number: "1/3 oeuf", "3 brioches".
   const itemText = unit ? parsed.item : agreeWithAmount(parsed.item, amount);
-  const item = itemText ? `${separator}${itemText}` : "";
+  const item = unit ? joinItem(parsed.item) : itemText ? ` ${itemText}` : "";
   // Mass and volume read as decimals; counted and spooned things read as
   // fractions.
-  const amountText = formatAmount(amount, { fractions: kind !== "measured" });
+  const asText = (value: number) => formatAmount(value, { fractions: kind !== "measured" });
+  const amountText =
+    high === null
+      ? asText(low.amount)
+      : parsed.rangeSeparator === "-" ||
+          parsed.rangeSeparator === "–" ||
+          parsed.rangeSeparator === "—"
+        ? `${asText(low.amount)}${parsed.rangeSeparator}${asText(high.amount)}`
+        : `${asText(low.amount)} ${parsed.rangeSeparator} ${asText(high.amount)}`;
   const text = `${amountText}${unitLabel}${item}`.trim();
+
+  const bounds = high === null ? [low] : [low, high];
+  const adjusted = bounds.some((bound) => Math.abs(bound.raw - bound.amount) > 0.01);
 
   const result: ScaledIngredient = {
     original: parsed.original,
@@ -197,10 +291,16 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
     amount,
     unit: unit?.canonical ?? null,
     scaling,
+    adjusted,
   };
 
-  if (scaling === "rounded" && Math.abs(raw - amount) > 0.01) {
-    result.note = `Rounded from ${formatAmount(Math.round(raw * 100) / 100)}.`;
+  if (bounds.some((bound) => bound.clamped)) {
+    result.note =
+      `Clamped up to ${formatAmount(SMALLEST_USABLE_FRACTION)} from ` +
+      `${formatAmount(Math.round(low.raw * 1000) / 1000)}, the smallest amount worth measuring. ` +
+      "This line no longer holds its share of the recipe.";
+  } else if (scaling === "rounded" && adjusted) {
+    result.note = `Rounded from ${formatAmount(Math.round(low.raw * 100) / 100)}.`;
   }
 
   return result;
@@ -220,6 +320,7 @@ export function passthroughIngredients(lines: string[]): ScaledIngredient[] {
       amount: parsed.amount,
       unit: parsed.unit?.canonical ?? null,
       scaling: "unscaled" as const,
+      adjusted: false,
     };
   });
 }

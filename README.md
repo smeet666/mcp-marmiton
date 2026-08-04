@@ -71,6 +71,15 @@ original: half a sachet at factor 0.667 becomes a third of a sachet, never a who
 one. And scaling never **silently drops** an ingredient by rounding it to zero,
 which is why small amounts come back as fractions.
 
+Ranges are read as one quantity: "2 à 3 gousses" doubled reads "4 à 6 gousses",
+and `amount` reports the upper bound, since that is what a cook buys.
+
+Below a quarter there is nothing a kitchen can measure, so the amount is clamped
+up and **the line stops holding its share of the recipe**. Half a sachet of
+baking powder against three pots of flour comes out four times too strong that
+way, so the ingredient and the response both say it happened rather than leaving
+you to find out in the oven.
+
 `scale_ingredients` exposes the same logic **without any network request**, so it
 also works on a recipe pasted from somewhere else.
 
@@ -241,6 +250,16 @@ Deux règles sont garanties. Réduire une recette **ne demande jamais davantage*
 l'originale : un demi-sachet au facteur 0,667 devient un tiers de sachet, jamais un
 sachet entier. Et l'adaptation ne **supprime jamais** un ingrédient en l'arrondissant
 à zéro, d'où les fractions pour les petites quantités.
+
+Les fourchettes sont lues comme une seule quantité : « 2 à 3 gousses » doublé
+donne « 4 à 6 gousses », et `amount` renvoie la borne haute, celle que l'on
+achète.
+
+Sous un quart, il n'y a plus rien qu'une cuisine puisse mesurer : la quantité est
+alors remontée et **la ligne cesse de tenir sa part de la recette**. Un demi-sachet
+de levure face à trois pots de farine ressort ainsi quatre fois trop dosé, donc
+l'ingrédient et la réponse le disent, plutôt que de vous le laisser découvrir au
+four.
 
 `scale_ingredients` expose la même logique **sans aucune requête réseau**, ce qui
 permet aussi d'adapter une recette venue d'ailleurs.

@@ -21,6 +21,8 @@ export interface UnitInfo {
   kind: UnitKind;
   /** Plural form when it is not simply the singular plus an "s". */
   plural?: string;
+  /** A metric symbol such as "g" or "cl", which never takes a plural mark. */
+  symbol?: true;
 }
 
 /**
@@ -29,23 +31,23 @@ export interface UnitInfo {
  */
 const UNITS: Record<string, UnitInfo> = {
   // Mass
-  g: { canonical: "g", kind: "measured" },
-  gr: { canonical: "g", kind: "measured" },
-  gramme: { canonical: "g", kind: "measured" },
-  grammes: { canonical: "g", kind: "measured" },
-  kg: { canonical: "kg", kind: "measured" },
-  kilo: { canonical: "kg", kind: "measured" },
-  kilos: { canonical: "kg", kind: "measured" },
-  kilogramme: { canonical: "kg", kind: "measured" },
-  mg: { canonical: "mg", kind: "measured" },
+  g: { canonical: "g", kind: "measured", symbol: true },
+  gr: { canonical: "g", kind: "measured", symbol: true },
+  gramme: { canonical: "g", kind: "measured", symbol: true },
+  grammes: { canonical: "g", kind: "measured", symbol: true },
+  kg: { canonical: "kg", kind: "measured", symbol: true },
+  kilo: { canonical: "kg", kind: "measured", symbol: true },
+  kilos: { canonical: "kg", kind: "measured", symbol: true },
+  kilogramme: { canonical: "kg", kind: "measured", symbol: true },
+  mg: { canonical: "mg", kind: "measured", symbol: true },
 
   // Volume
-  ml: { canonical: "ml", kind: "measured" },
-  cl: { canonical: "cl", kind: "measured" },
-  dl: { canonical: "dl", kind: "measured" },
-  l: { canonical: "l", kind: "measured" },
-  litre: { canonical: "l", kind: "measured" },
-  litres: { canonical: "l", kind: "measured" },
+  ml: { canonical: "ml", kind: "measured", symbol: true },
+  cl: { canonical: "cl", kind: "measured", symbol: true },
+  dl: { canonical: "dl", kind: "measured", symbol: true },
+  l: { canonical: "l", kind: "measured", symbol: true },
+  litre: { canonical: "l", kind: "measured", symbol: true },
+  litres: { canonical: "l", kind: "measured", symbol: true },
 
   // Spoons and cups: real measures, but only in sensible fractions.
   "cuillere a soupe": {
@@ -166,6 +168,18 @@ const DEMOTIONS: Record<string, UnitStep> = {
   g: { to: "mg", per: 1000 },
 };
 
+/**
+ * The unit one step down the metric ladder, with how many of it fit in one of
+ * the current unit. Null at the bottom of a ladder, where there is nothing
+ * smaller to express the amount in.
+ */
+export function demoteUnit(unit: UnitInfo): { unit: UnitInfo; per: number } | null {
+  const step = DEMOTIONS[unit.canonical];
+  if (!step) return null;
+  const target = lookupUnit(step.to);
+  return target ? { unit: target, per: step.per } : null;
+}
+
 export interface ConvertedAmount {
   amount: number;
   unit: UnitInfo;
@@ -209,9 +223,8 @@ export function convertToReadableUnit(unit: UnitInfo, amount: number): Converted
  * à soupe", not "1,5 cuillères".
  */
 export function formatUnit(unit: UnitInfo, amount: number): string {
+  if (unit.symbol) return unit.canonical;
   if (amount < 2) return unit.canonical;
   if (unit.plural) return unit.plural;
-  // Symbols such as "g", "kg" and "cl" are invariable.
-  if (/^[a-z]{1,3}$/.test(unit.canonical)) return unit.canonical;
   return `${unit.canonical}s`;
 }

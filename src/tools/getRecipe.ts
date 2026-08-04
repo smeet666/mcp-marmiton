@@ -125,8 +125,24 @@ export async function runGetRecipe(
           Math.round(factor * 100) / 100
         }).`,
       );
-      if (ingredients.some((entry) => entry.scaling === "rounded")) {
-        notes.push("Some quantities were rounded to remain usable; see the 'scaling' field.");
+      // Lines that were actually moved, rather than lines that merely belong to
+      // the roundable category: doubling a recipe lands every egg whole.
+      const roundedCount = ingredients.filter(
+        (entry) => entry.scaling === "rounded" && entry.adjusted,
+      ).length;
+      if (roundedCount > 0) {
+        notes.push(
+          `${roundedCount} quantity(ies) were rounded to remain usable; see the 'scaling' field.`,
+        );
+      }
+      const clampedCount = ingredients.filter((entry) =>
+        /clamped up/i.test(entry.note ?? ""),
+      ).length;
+      if (clampedCount > 0) {
+        notes.push(
+          `${clampedCount} quantity(ies) fell below the smallest amount worth measuring and were ` +
+            "clamped up, so their proportions no longer match the published recipe.",
+        );
       }
       if (ingredients.some((entry) => entry.scaling === "unscaled")) {
         notes.push("Some ingredients carry no usable quantity and were left as published.");
@@ -192,14 +208,27 @@ export async function runGetRecipe(
       .filter(Boolean)
       .join("\n");
 
+    // The flag answers "why is this line unchanged", which is only a question
+    // when a rescaling was asked for. Without 'servings' it would read as a
+    // statement about the ingredient itself.
+    const rescaled = args.servings !== undefined && factor !== null;
     const ingredientLines = ingredients
       .map((entry) => {
-        const flag = entry.scaling === "unscaled" ? " (non ajusté)" : "";
+        const flag = rescaled && entry.scaling === "unscaled" ? " (non ajusté)" : "";
         return `- ${entry.text}${flag}`;
       })
       .join("\n");
 
-    return ok(structured, `${header}\n\nIngrédients:\n${ingredientLines}`);
+    const stepLines = data.steps.map((step, index) => `${index + 1}. ${step}`).join("\n");
+    const body = [
+      header,
+      `Ingrédients:\n${ingredientLines}`,
+      stepLines ? `Préparation:\n${stepLines}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    return ok(structured, body, notes);
   } catch (error) {
     return toToolError(error);
   }

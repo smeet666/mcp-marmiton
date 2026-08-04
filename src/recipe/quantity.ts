@@ -78,6 +78,14 @@ export interface ParsedIngredient {
   /** The line exactly as Marmiton stores it. */
   original: string;
   amount: number | null;
+  /**
+   * Upper bound when the line gives a range, as in "2 à 3 gousses". Null for a
+   * single amount. `amount` holds the lower bound, so the two must be scaled
+   * together: multiplying only one turns "2 à 3" into the nonsense "4 à 3".
+   */
+  amountMax: number | null;
+  /** The word or sign the range was written with: "à", "-", "ou". */
+  rangeSeparator: string | null;
   unit: UnitInfo | null;
   /** Raw unit text as written, kept so the rewrite can stay faithful. */
   unitText: string | null;
@@ -95,9 +103,18 @@ export function parseIngredient(line: string): ParsedIngredient {
   const original = line;
   const text = line.trim();
 
-  const quantity = parseLeadingQuantity(text);
+  const range = parseLeadingRange(text);
+  const quantity = range ?? parseLeadingQuantity(text);
   if (!quantity) {
-    return { original, amount: null, unit: null, unitText: null, item: text };
+    return {
+      original,
+      amount: null,
+      amountMax: null,
+      rangeSeparator: null,
+      unit: null,
+      unitText: null,
+      item: text,
+    };
   }
 
   let rest = text.slice(quantity.length).trimStart();
@@ -124,7 +141,56 @@ export function parseIngredient(line: string): ParsedIngredient {
   // "200 g de farine" reads better as item "farine" than "de farine".
   const item = rest.replace(/^(?:de\s+la\s+|de\s+l'|d'|de\s+|du\s+|des\s+)/i, "").trim();
 
-  return { original, amount: quantity.amount, unit, unitText, item };
+  return {
+    original,
+    amount: quantity.amount,
+    amountMax: range?.max ?? null,
+    rangeSeparator: range?.separator ?? null,
+    unit,
+    unitText,
+    item,
+  };
+}
+
+export interface ParsedRange extends ParsedQuantity {
+  /** Upper bound. `amount` carries the lower one. */
+  max: number;
+  /** How the range was written, so the rewrite can keep the same shape. */
+  separator: string;
+}
+
+/**
+ * Read a leading range such as "2 à 3", "2-3" or "3 ou 4".
+ *
+ * Recipes use ranges where the exact amount is the cook's call, and both bounds
+ * describe the same quantity. Reading only the first one is worse than reading
+ * neither: the second number survives unscaled into the answer and contradicts
+ * it.
+ *
+ * A descending pair is not a range. "1/2 3" is two amounts the parser has no
+ * business joining, and a dash between two numbers is a range only when the
+ * second is the larger.
+ */
+export function parseLeadingRange(text: string): ParsedRange | null {
+  const low = parseLeadingQuantity(text);
+  if (!low) return null;
+
+  const after = text.slice(low.length);
+  const separator = /^\s*(à|a|ou|-|–|—|\/)\s*/.exec(after);
+  if (!separator) return null;
+  // A slash between two numbers is a fraction, which parseLeadingQuantity has
+  // already consumed if it was one.
+  if (separator[1] === "/") return null;
+
+  const high = parseLeadingQuantity(after.slice(separator[0].length));
+  if (!high || high.amount <= low.amount) return null;
+
+  return {
+    amount: low.amount,
+    max: high.amount,
+    separator: separator[1]!,
+    length: low.length + separator[0].length + high.length,
+  };
 }
 
 export interface FormatAmountOptions {
