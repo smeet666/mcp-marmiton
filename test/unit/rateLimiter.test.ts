@@ -40,6 +40,7 @@ describe("RateLimiter", () => {
     const limiter = new RateLimiter({ minIntervalMs: 1000 });
     const starts: number[] = [];
     const task = async () => {
+      await limiter.beforeRequest();
       starts.push(Date.now());
       return starts.length;
     };
@@ -63,6 +64,7 @@ describe("RateLimiter", () => {
     const all = Promise.all(
       ["a", "b", "c", "d"].map((name) =>
         limiter.schedule(async () => {
+          await limiter.beforeRequest();
           order.push(name);
         }),
       ),
@@ -149,6 +151,7 @@ describe("RateLimiter", () => {
 
     const starts: number[] = [];
     const task = async () => {
+      await limiter.beforeRequest();
       starts.push(Date.now());
     };
     const all = Promise.all([limiter.schedule(task), limiter.schedule(task)]);
