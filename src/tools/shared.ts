@@ -51,8 +51,8 @@ export interface ToolResult {
  * The notes are what qualifies the answer: that a quantity was clamped and no
  * longer holds its share, that the nutrition figures describe the recipe as
  * published rather than the amounts printed above them, that two ways of asking
- * for the same thing disagreed. A client rendering only the text read the
- * unqualified answer without them.
+ * for the same thing disagreed. Without them a client rendering only the text
+ * reads an answer with nothing to qualify it.
  *
  * They are appended after the body is trimmed, so they survive a long
  * ingredient list.
