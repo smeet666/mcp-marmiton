@@ -4,6 +4,7 @@
 [![CI](https://github.com/smeet666/mcp-marmiton/actions/workflows/ci.yml/badge.svg)](https://github.com/smeet666/mcp-marmiton/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/mcp-marmiton.svg)](./LICENSE)
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-listed-6E56CF)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.smeet666/mcp-marmiton)
+[![Glama](https://glama.ai/mcp/servers/smeet666/mcp-marmiton/badges/score.svg)](https://glama.ai/mcp/servers/smeet666/mcp-marmiton)
 
 An [MCP](https://modelcontextprotocol.io) server for [Marmiton](https://www.marmiton.org),
 the French recipe site. Search recipes, read their ingredients and steps, and
