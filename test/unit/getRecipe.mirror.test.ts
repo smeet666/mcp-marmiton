@@ -15,7 +15,7 @@ const RECIPE = {
   title: "Gâteau au yaourt",
   url: "https://www.marmiton.org/recettes/recette_gateau-au-yaourt_12719.aspx",
   recipeYield: { count: 4, text: "4 personnes", unit: "personnes" },
-  ingredients: ["1 pot de yaourt", "3 pots de farine", "2 oeufs", "1 pincée de sel"],
+  ingredients: ["1 pot de yaourt", "3 pots de farine", "2 oeufs", "1 pincée de sel", "cannelle"],
   steps: [
     "Préchauffer le four à 180°C.",
     "Mélanger le yaourt, la farine et les oeufs.",

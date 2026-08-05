@@ -78,7 +78,8 @@ describe("scale_ingredients text block", () => {
   });
 
   it("still flags a line that genuinely cannot be scaled", () => {
-    const text = textOf(runScaleIngredients({ ingredients: ["1 pincée de sel"], factor: 2 }));
+    // "sel" on its own carries no quantity at all, which is what the flag is for.
+    const text = textOf(runScaleIngredients({ ingredients: ["sel"], factor: 2 }));
 
     expect(text).toContain("non ajusté");
   });

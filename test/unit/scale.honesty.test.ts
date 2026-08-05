@@ -119,7 +119,78 @@ describe("proportions", () => {
   });
 });
 
+describe("approximate measures", () => {
+  it("multiplies the number of pinches of a raising agent", () => {
+    // A batter written for 6 and cooked for 25 needs the raising agent to follow
+    // the flour. Returning the line untouched with "adjust to taste" hands the
+    // cook a cake that cannot rise, and no amount of tasting recovers it.
+    const result = scale("une pincée de bicarbonate de soude", 25 / 6);
+
+    expect(result.text).toBe("4 pincées de bicarbonate de soude");
+    expect(result.amount).toBe(4);
+    expect(result.unit).toBe("pincée");
+    expect(result.scaling).toBe("rounded");
+    expect(result.note ?? "").toMatch(/approximate/i);
+    expect(result.note ?? "").not.toMatch(/no quantity given/i);
+  });
+
+  it("reads an article as the quantity it stands for", () => {
+    expect(scale("une pincée de sel", 4).amount).toBe(4);
+    expect(scale("un trait de vinaigre", 4).amount).toBe(4);
+    expect(scale("quelques gouttes de vanille", 2).text).toBe("6 gouttes de vanille");
+  });
+
+  it("scales every approximate measure by its count", () => {
+    const cases: Array<[string, string]> = [
+      ["1 pincée de sel", "3 pincées de sel"],
+      ["1 poignée de roquette", "3 poignées de roquette"],
+      ["1 trait de vinaigre", "3 traits de vinaigre"],
+      ["1 filet d'huile d'olive", "3 filets d'huile d'olive"],
+      ["1 noix de beurre", "3 noix de beurre"],
+      ["1 soupçon de muscade", "3 soupçons de muscade"],
+      ["2 gouttes d'extrait de vanille", "6 gouttes d'extrait de vanille"],
+    ];
+    for (const [line, expected] of cases) {
+      expect(scale(line, 3).text, line).toBe(expected);
+    }
+  });
+
+  it("keeps an approximate measure in its own unit", () => {
+    // Published equivalences for a pinch span a fourfold range, so a gram or a
+    // spoon figure here would be a number the recipe never carried.
+    const result = scale("une pincée de bicarbonate de soude", 25 / 6);
+
+    expect(result.text).not.toMatch(/\b(g|kg|mg|ml|cl|l)\b/);
+    expect(result.text).not.toMatch(/cuillère/i);
+    expect(result.note ?? "").not.toMatch(/\d\s*(g|ml)\b/);
+  });
+
+  it("stays at one pinch when the recipe shrinks", () => {
+    const result = scale("1 pincée de sel", 0.25);
+
+    expect(result.amount).toBe(1);
+    expect(result.text).toBe("1 pincée de sel");
+  });
+
+  it("keeps 'no quantity given' for a line that carries none", () => {
+    const result = scale("sel", 4);
+
+    expect(result.scaling).toBe("unscaled");
+    expect(result.note ?? "").toMatch(/no quantity given/i);
+  });
+});
+
 describe("French agreement", () => {
+  it("agrees a trailing adjective with the count", () => {
+    expect(scale("1 piment de Cayenne entier", 25 / 6).text).toBe("4 piments de Cayenne entiers");
+    expect(scale("1 pomme entière", 3).text).toBe("3 pommes entières");
+  });
+
+  it("leaves a trailing word it cannot decline alone", () => {
+    expect(scale("1 pomme Golden", 4).text).toBe("4 pommes Golden");
+    expect(scale("1 oignon rouge", 4).text).toBe("4 oignons rouges");
+  });
+
   it("writes a plural unit as a plural", () => {
     expect(scale("1 pot de yaourt", 25).text).toContain("25 pots");
   });

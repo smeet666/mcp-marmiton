@@ -24,7 +24,7 @@ describe("lookupUnit", () => {
   });
 
   it("classifies imprecise measures as vague", () => {
-    for (const key of ["pincée", "trait", "filet", "goutte", "poignée"]) {
+    for (const key of ["pincée", "trait", "filet", "goutte", "poignée", "noix", "soupçon"]) {
       expect(lookupUnit(key)?.kind, key).toBe("vague");
     }
   });
@@ -42,6 +42,7 @@ describe("lookupUnit", () => {
   it("is accent-insensitive", () => {
     expect(lookupUnit("cuilleres a soupe")?.canonical).toBe("cuillère à soupe");
     expect(lookupUnit("pincee")?.canonical).toBe("pincée");
+    expect(lookupUnit("soupcon")?.canonical).toBe("soupçon");
   });
 
   it("resolves common abbreviations to the same unit", () => {

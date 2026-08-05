@@ -5,7 +5,7 @@
 import { z } from "zod";
 import type { MarmitonClient } from "../marmiton/client.js";
 import { formatMinutes } from "../recipe/duration.js";
-import { passthroughIngredients, scaleIngredients } from "../recipe/scale.js";
+import { isApproximateMeasure, passthroughIngredients, scaleIngredients } from "../recipe/scale.js";
 import type { ScaledIngredient } from "../recipe/scale.js";
 import { ok, scaledIngredientSchema, toToolError } from "./shared.js";
 import type { ToolResult } from "./shared.js";
@@ -13,10 +13,10 @@ import type { ToolResult } from "./shared.js";
 export const getRecipeDescription = [
   "Read one Marmiton recipe: ingredients, steps, times, category, rating and nutrition.",
   "Give the id returned by search_recipes, or a marmiton.org recipe URL.",
-  "Set 'servings' to rescale the quantities. Each ingredient reports how it was handled: 'scaled' for grams",
-  "and millilitres, 'rounded' for countable things such as eggs or spoons, and 'unscaled' for lines with no",
-  "quantity or with an approximate one such as a pinch of salt. Trust that flag rather than recomputing:",
-  "the point of scaling here is to avoid answers like '2.4 eggs'.",
+  "Set 'servings' to rescale the quantities. Each ingredient reports how it was handled: 'scaled' when the",
+  "arithmetic came out exact, which a count of eggs, spoons or pinches reaches as readily as a mass in grams,",
+  "'rounded' when the value had to be moved to stay usable, and 'unscaled' for lines carrying no quantity at all.",
+  "Trust that flag rather than recomputing: the point of scaling here is to avoid answers like '2.4 eggs'.",
   "Recipes yielding pieces rather than servings are rescaled the same way; check 'yield' to see which.",
   "Always cite 'attribution' when showing a recipe to a user.",
 ].join(" ");
@@ -142,6 +142,12 @@ export async function runGetRecipe(
         notes.push(
           `${clampedCount} quantity(ies) fell below the smallest amount worth measuring and were ` +
             "clamped up, so their proportions no longer match the published recipe.",
+        );
+      }
+      if (ingredients.some(isApproximateMeasure)) {
+        notes.push(
+          "Approximate measures such as a pinch or a handful had their count multiplied; the size " +
+            "of one is yours to judge.",
         );
       }
       if (ingredients.some((entry) => entry.scaling === "unscaled")) {

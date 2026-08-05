@@ -49,25 +49,27 @@ describe("scaleIngredient — measured units scale continuously", () => {
   });
 
   it("rounds to a 5 step at or above 100", () => {
-    // 200 x 0.667 = 133.4
+    // 200 x 0.667 = 133.4, and 135 is not that product: a value a step moved
+    // is reported as rounded, whatever unit it is written in.
     const r = scaleIngredient("200 g de farine", { factor: 0.667 });
-    expect(r.scaling).toBe("scaled");
+    expect(r.scaling).toBe("rounded");
     expect(r.amount! % 5).toBe(0);
     expect(r.amount).toBe(135);
   });
 
   it("rounds to a 1 step between 10 and 100", () => {
-    // 25 x 0.667 = 16.675
+    // 25 x 0.667 = 16.675, and the answer of 17 is a rounded one.
     const r = scaleIngredient("25 cl de lait", { factor: 0.667 });
-    expect(r.scaling).toBe("scaled");
+    expect(r.scaling).toBe("rounded");
     expect(Number.isInteger(r.amount)).toBe(true);
     expect(r.amount).toBe(17);
   });
 
   it("rounds to a half step between 1 and 10", () => {
-    // 3 x 0.667 = 2.001 -> 2 ; 3 x 1.2 = 3.6 -> 3.5
+    // 3 x 0.667 = 2.001 -> 2 ; 3 x 1.2 = 3.6 -> 3.5, which is a tenth away
+    // from the product and therefore rounded.
     const r = scaleIngredient("3 g de sel fin", { factor: 1.2 });
-    expect(r.scaling).toBe("scaled");
+    expect(r.scaling).toBe("rounded");
     expect((r.amount! * 2) % 1).toBe(0);
     expect(r.amount).toBe(3.5);
   });
@@ -83,16 +85,17 @@ describe("scaleIngredient — measured units scale continuously", () => {
 
 describe("scaleIngredient — countables round to whole units", () => {
   it("doubles eggs", () => {
+    // Six is the product itself, so nothing was rounded and the label says so.
     const r = scaleIngredient("3 oeufs", { factor: 2 });
-    expect(r.scaling).toBe("rounded");
+    expect(r.scaling).toBe("scaled");
     expect(r.amount).toBe(6);
     expect(r.text).toBe("6 oeufs");
   });
 
   it("never produces a fraction of an egg on a plausible factor", () => {
-    // 3 x 0.667 = 2.001
+    // 3 x 0.667 = 2.001, near enough to two whole eggs to count as exact.
     const r = scaleIngredient("3 oeufs", { factor: 0.667 });
-    expect(r.scaling).toBe("rounded");
+    expect(r.scaling).toBe("scaled");
     expect(Number.isInteger(r.amount)).toBe(true);
     expect(r.amount).toBe(2);
     expect(r.text).toBe("2 oeufs");
@@ -106,8 +109,9 @@ describe("scaleIngredient — countables round to whole units", () => {
   });
 
   it("promotes a half citron to a whole one when doubling", () => {
+    // Half a lemon doubled is one lemon exactly.
     const r = scaleIngredient("0.5 citron", { factor: 2 });
-    expect(r.scaling).toBe("rounded");
+    expect(r.scaling).toBe("scaled");
     expect(r.amount).toBe(1);
     expect(r.text).toBe("1 citron");
   });
@@ -123,8 +127,9 @@ describe("scaleIngredient — countables round to whole units", () => {
 
 describe("scaleIngredient — portioned units tolerate halves only where a cook does", () => {
   it("doubles spoons and agrees the plural", () => {
+    // Two spoons doubled are four spoons exactly.
     const r = scaleIngredient("2 cuillères à soupe de sucre", { factor: 2 });
-    expect(r.scaling).toBe("rounded");
+    expect(r.scaling).toBe("scaled");
     expect(r.amount).toBe(4);
     expect(r.text).toBe("4 cuillères à soupe de sucre");
   });
@@ -200,15 +205,22 @@ describe("scaleIngredient — a counted item agrees with its amount both ways", 
   });
 });
 
-describe("scaleIngredient — vague and amountless lines are left alone", () => {
-  it("returns a vague amount byte-identical", () => {
+describe("scaleIngredient — approximate measures scale by their count", () => {
+  it("multiplies the number of pinches, in whole pinches", () => {
     const line = "1 pincée de sel";
-    for (const factor of [0.5, 0.667, 2, 4]) {
+    // A pinch multiplied by a whole number lands on a whole count with no
+    // rounding to do, and only the halved line had to be moved, up to the one
+    // pinch a hand can still produce.
+    for (const [factor, expected, scaling] of [
+      [2, "2 pincées de sel", "scaled"],
+      [4, "4 pincées de sel", "scaled"],
+      [0.5, "1 pincée de sel", "rounded"],
+    ] as Array<[number, string, string]>) {
       const r = scaleIngredient(line, { factor });
-      expect(r.scaling).toBe("unscaled");
-      expect(r.text).toBe(line);
+      expect(r.scaling, `factor ${factor}`).toBe(scaling);
+      expect(r.text, `factor ${factor}`).toBe(expected);
       expect(r.original).toBe(line);
-      expect(r.note).toBeTruthy();
+      expect(r.note, `factor ${factor}`).toBeTruthy();
     }
   });
 
@@ -220,16 +232,16 @@ describe("scaleIngredient — vague and amountless lines are left alone", () => 
     expect(r.note).toBeTruthy();
   });
 
-  it("leaves other vague units alone too", () => {
-    for (const line of [
-      "1 trait de vinaigre",
-      "1 filet d'huile d'olive",
-      "2 gouttes d'extrait de vanille",
-      "1 poignée de roquette",
-    ]) {
+  it("multiplies the other approximate measures too", () => {
+    for (const [line, expected] of [
+      ["1 trait de vinaigre", "3 traits de vinaigre"],
+      ["1 filet d'huile d'olive", "3 filets d'huile d'olive"],
+      ["2 gouttes d'extrait de vanille", "6 gouttes d'extrait de vanille"],
+      ["1 poignée de roquette", "3 poignées de roquette"],
+    ] as Array<[string, string]>) {
       const r = scaleIngredient(line, { factor: 3 });
-      expect(r.scaling, line).toBe("unscaled");
-      expect(r.text, line).toBe(line);
+      expect(r.scaling, line).toBe("scaled");
+      expect(r.text, line).toBe(expected);
     }
   });
 });
@@ -354,11 +366,13 @@ describe("scaleIngredients", () => {
     const kinds = Object.fromEntries(out.map((r) => [r.original, r.scaling]));
     expect(kinds["200 g de farine"]).toBe("scaled");
     expect(kinds["25 cl de lait"]).toBe("scaled");
-    expect(kinds["3 oeufs"]).toBe("rounded");
-    expect(kinds["2 cuillères à soupe de sucre"]).toBe("rounded");
-    expect(kinds["0.5 citron"]).toBe("rounded");
-    expect(kinds["1/2 sachet de levure"]).toBe("rounded");
-    expect(kinds["1 pincée de sel"]).toBe("unscaled");
+    // Doubling lands every one of these on a whole count with nothing to
+    // round, which is what "scaled" states.
+    expect(kinds["3 oeufs"]).toBe("scaled");
+    expect(kinds["2 cuillères à soupe de sucre"]).toBe("scaled");
+    expect(kinds["0.5 citron"]).toBe("scaled");
+    expect(kinds["1/2 sachet de levure"]).toBe("scaled");
+    expect(kinds["1 pincée de sel"]).toBe("scaled");
     expect(kinds["coriandre"]).toBe("unscaled");
   });
 
@@ -453,10 +467,11 @@ describe("scaleIngredient — a scaled amount stays at a human size", () => {
     expect(Math.abs(grams - 50 * (100 / 3))).toBeLessThan(20);
   });
 
-  it("leaves countable and vague units off the ladder", () => {
-    // Only mass and volume have a metric ladder; 2000 sachets stay sachets.
+  it("leaves countable and approximate units off the ladder", () => {
+    // Only mass and volume have a metric ladder; 2000 sachets stay sachets, and
+    // a thousand pinches stay pinches rather than being weighed out in grams.
     expect(scaleIngredient("2 sachets de levure", { factor: 1000 }).unit).toBe("sachet");
-    expect(scaleIngredient("1 pincée de sel", { factor: 1000 }).scaling).toBe("unscaled");
+    expect(scaleIngredient("1 pincée de sel", { factor: 1000 }).unit).toBe("pincée");
   });
 });
 

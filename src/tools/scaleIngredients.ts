@@ -8,7 +8,7 @@
 
 import { z } from "zod";
 import { invalidInput } from "../errors.js";
-import { scaleIngredients } from "../recipe/scale.js";
+import { isApproximateMeasure, scaleIngredients } from "../recipe/scale.js";
 import { ok, scaledIngredientSchema, toToolError } from "./shared.js";
 import type { ToolResult } from "./shared.js";
 
@@ -17,8 +17,10 @@ export const scaleIngredientsDescription = [
   "Give either 'factor' directly, or 'from_servings' and 'to_servings' and the factor is computed.",
   "Works on any French ingredient list, whatever its source, so it also serves a recipe the user pasted in.",
   "Quantities in grams or millilitres are multiplied and rounded to readable values; countable things such as",
-  "eggs or spoons are rounded to whole or half units; lines with no quantity, or with an approximate one such",
-  "as a pinch, are returned untouched and flagged. Prefer this over doing the arithmetic yourself.",
+  "eggs or spoons are rounded to whole or half units; approximate measures such as a pinch or a handful have",
+  "their count multiplied in whole units and stay in their own vocabulary. A line writing an article where a",
+  "digit would go, as in 'un bouchon de rhum' or 'une pincée de sel', is read as one of that measure. Lines",
+  "carrying no quantity are returned untouched and flagged. Prefer this over doing the arithmetic yourself.",
 ].join(" ");
 
 export const scaleIngredientsInputShape = {
@@ -103,6 +105,7 @@ export function runScaleIngredients(args: ScaleIngredientsArgs): ToolResult {
       rounded: ingredients.filter((entry) => entry.scaling === "rounded" && entry.adjusted).length,
       unscaled: ingredients.filter((entry) => entry.scaling === "unscaled").length,
       clamped: ingredients.filter((entry) => /clamped up/i.test(entry.note ?? "")).length,
+      approximate: ingredients.filter(isApproximateMeasure).length,
     };
 
     if (counts.rounded > 0) {
@@ -113,6 +116,12 @@ export function runScaleIngredients(args: ScaleIngredientsArgs): ToolResult {
     if (counts.unscaled > 0) {
       notes.push(
         `${counts.unscaled} line(s) carry no usable quantity and were returned unchanged; adjust to taste.`,
+      );
+    }
+    if (counts.approximate > 0) {
+      notes.push(
+        `${counts.approximate} approximate measure(s) such as a pinch or a handful had their count ` +
+          "multiplied; the size of one is yours to judge.",
       );
     }
     if (counts.clamped > 0) {

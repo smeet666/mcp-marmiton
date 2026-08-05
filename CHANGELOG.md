@@ -1,5 +1,63 @@
 # Changelog
 
+## 1.5.0
+
+- Read an approximate measure from the shape of the line as well as from the
+  vocabulary. A noun standing between the amount and the partitive that
+  introduces what is measured names a container or a gesture whose size belongs
+  to the cook: `un bouchon de rhum` scaled sixfold comes back as
+  `6 bouchons de rhum`, and so does a container no list carries, such as
+  `un ramequin de crème fraîche`. The line came back untouched and flagged
+  `unscaled` with "No quantity given" before, which was false: a bouchon is an
+  amount.
+- Add `bouchon`, `larme`, `doigt`, `nuage`, `louche`, `lichette` and `pointe` to
+  the vocabulary of approximate measures.
+- An article written in place of a digit is read before any measure, not only an
+  approximate one, so `un sachet de levure` and `un litre de lait` scale like
+  the lines that open on a figure. The note says which word the figure was read
+  from. An article before a bare countable thing, as in `un oignon`, still
+  leaves the line as published.
+- Take the article with the amount it belongs to when a line states a share of
+  one thing: `2/3 d'un flacon de fleur d'oranger` scaled sixfold reads
+  `4 flacons de fleur d'oranger`, with the plural agreed, instead of leaving the
+  article stranded in front of the count.
+- A counted noun in -eau or -al takes the plural French gives it, so
+  `1 morceau de beurre` multiplied reads `6 morceaux de beurre`.
+- `scaling` reports what the arithmetic did rather than what the unit is.
+  `scaled` means the value is the product itself, which a count of eggs, spoons
+  or pinches reaches as readily as a mass in grams: one pinch multiplied by six
+  is six pinches, exactly. `rounded` is kept for a value that had to be moved,
+  whether to a whole unit or to a step a scale can show, so a measurement
+  rounded from 133.4 g to 135 g reports it.
+
+## 1.4.0
+
+- Scale approximate French measures instead of returning them untouched. A pinch,
+  a handful, a drizzle, a knob, a dash, a drop or a hint is a quantity, and the
+  proportion of the recipe lives in how many of them a line asks for, so the
+  count is now multiplied in whole units: `une pincée de bicarbonate de soude`
+  taken from 6 servings to 25 comes back as `4 pincées de bicarbonate de soude`,
+  flagged `rounded`, with a note saying the measure is approximate. Previously
+  the line came back unchanged, flagged `unscaled`, with the note "No quantity
+  given; adjust to taste." That was wrong twice over: the line does carry a
+  quantity, and tasting cannot rescue a batter raised by a single pinch of
+  bicarbonate for four times the flour.
+- No approximate measure is converted into grams or spoons. Published
+  equivalences for a pinch span a fourfold range, so any such figure would be a
+  number the recipe never carried; an order of magnitude belongs in a note.
+- Read the article a recipe writes in place of a digit before such a measure:
+  `une`, `un` and `quelques`, the last read as three, with the word it came from
+  reported in the note. An article before a countable thing, as in `un oignon`,
+  still leaves the line as published.
+- Add `noix` and `soupçon` to the vocabulary of approximate measures, alongside
+  `pincée`, `poignée`, `trait`, `filet` and `goutte`.
+- `unscaled` now means one thing only: the line carries no quantity at all, as in
+  `sel` or `coriandre`, and that is where the note "No quantity given" remains.
+- Agree a trailing adjective with the count on a counted item, so
+  `1 piment de Cayenne entier` multiplied reads `4 piments de Cayenne entiers`. A
+  trailing word outside a short list of common recipe adjectives is left as the
+  recipe wrote it, since a brand or a proper noun takes no plural mark.
+
 ## 1.3.1
 
 - Stop published text from producing a line shaped like one this server writes.

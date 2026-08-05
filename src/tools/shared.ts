@@ -24,17 +24,24 @@ export const scaledIngredientSchema = z.object({
   scaling: z
     .enum(["scaled", "rounded", "unscaled"])
     .describe(
-      "'scaled' was multiplied cleanly. 'rounded' was multiplied then rounded to something countable. " +
-        "'unscaled' was left alone, either because it carries no quantity or because the measure is " +
-        "approximate by nature.",
+      "'scaled' means the arithmetic came out exact, which a count reaches as readily as a mass: one " +
+        "pinch multiplied by six is six pinches. 'rounded' means the value had to be moved to stay " +
+        "usable, to a whole or half unit or to a step a scale can show. 'unscaled' was left alone, " +
+        "because the line carries no quantity.",
     ),
   adjusted: z
     .boolean()
     .describe(
-      "True when rounding moved the value away from the exact product. A line can be 'rounded' and " +
-        "still land exactly, as three eggs doubled land on six.",
+      "True when rounding moved the value away from the exact product, which is what makes a line " +
+        "'rounded' rather than 'scaled'.",
     ),
-  note: z.string().optional().describe("Why the line was rounded, clamped or left alone."),
+  note: z
+    .string()
+    .optional()
+    .describe(
+      "Why the line was rounded, clamped or left alone, including when the measure is approximate and " +
+        "only its count was multiplied.",
+    ),
 });
 
 export interface ToolResult {

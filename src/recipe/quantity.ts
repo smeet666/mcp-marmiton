@@ -7,7 +7,7 @@
  */
 
 import type { UnitInfo } from "./units.js";
-import { lookupUnit, normalizeUnitKey, UNIT_KEYS } from "./units.js";
+import { lookupUnit, normalizeUnitKey, readPartitiveMeasure, UNIT_KEYS } from "./units.js";
 
 export interface ParsedQuantity {
   amount: number;
@@ -74,6 +74,96 @@ export function parseLeadingQuantity(text: string): ParsedQuantity | null {
   return null;
 }
 
+/**
+ * Articles a recipe writes where a digit would go, and what they count as.
+ *
+ * "quelques" names a small handful of them; three is the reading, and the word
+ * travels with the result so a caller can see the amount came from a word.
+ */
+const ARTICLE_AMOUNTS: Record<string, number> = {
+  un: 1,
+  une: 1,
+  quelques: 3,
+};
+
+export interface ParsedArticle extends ParsedQuantity {
+  /** The article as the line wrote it. */
+  word: string;
+}
+
+/**
+ * Read a leading article standing in for a number, as in "une pincée de sel".
+ *
+ * The article counts as a quantity only when a measure follows it, because that
+ * is where it stands for a number: "une pincée" is one pinch and "un sachet" is
+ * one sachet, while "un oignon" names a vegetable and no amount. Reading the
+ * second as the first would multiply a number the line never wrote.
+ */
+export function parseLeadingArticle(text: string): ParsedArticle | null {
+  const match = /^\s*(un|une|quelques)\b\s*/i.exec(text);
+  if (!match) return null;
+
+  const rest = text.slice(match[0].length);
+  if (!matchLeadingUnit(rest, true)) return null;
+
+  const word = match[1]!;
+  return {
+    amount: ARTICLE_AMOUNTS[word.toLowerCase()]!,
+    length: match[0].length,
+    word,
+  };
+}
+
+interface MatchedUnit {
+  unit: UnitInfo;
+  /** Unit text as the line wrote it, accents and all. */
+  unitText: string;
+  /** What follows the unit. */
+  rest: string;
+}
+
+/**
+ * Read a unit at the start of a line, longest spelling first, so "cuillère à
+ * soupe" is not read as "cuillère" with "à soupe" spilling into the item name.
+ *
+ * A noun the vocabulary does not carry can still be a measure, and the
+ * partitive that follows it says so, which is what `readPartitiveMeasure`
+ * reads. That reading is offered only where the line wrote an article instead
+ * of a digit, because that is the position where a noun measures rather than
+ * names: "un bouchon de rhum" asks for an amount, while "1 piment de Cayenne"
+ * asks for a chilli whose variety happens to be introduced the same way. The
+ * vocabulary is consulted first either way, so a word it holds keeps the kind
+ * and the spelling it was given there.
+ */
+function matchLeadingUnit(text: string, partitive = false): MatchedUnit | null {
+  const normalized = normalizeUnitKey(text);
+  for (const key of UNIT_KEYS) {
+    if (normalized !== key && !normalized.startsWith(`${key} `)) continue;
+    const unit = lookupUnit(key);
+    if (!unit) continue;
+    // Consume the same number of words from the original text, which may be
+    // spelled with accents the normalized key has lost.
+    const wordCount = key.split(" ").length;
+    const words = text.trim().split(/\s+/);
+    return {
+      unit,
+      unitText: words.slice(0, wordCount).join(" "),
+      rest: words.slice(wordCount).join(" "),
+    };
+  }
+
+  const measure = partitive ? readPartitiveMeasure(text) : null;
+  if (measure) {
+    return {
+      unit: measure.unit,
+      unitText: text.trim().split(/\s+/)[0]!,
+      rest: measure.rest,
+    };
+  }
+
+  return null;
+}
+
 export interface ParsedIngredient {
   /** The line exactly as Marmiton stores it. */
   original: string;
@@ -91,6 +181,11 @@ export interface ParsedIngredient {
   unitText: string | null;
   /** What the amount and unit apply to, for example "farine" or "oeufs". */
   item: string;
+  /**
+   * The article the amount was read from, as in "une" in "une pincée de sel".
+   * Null when the line wrote a number.
+   */
+  articleWord: string | null;
 }
 
 /**
@@ -104,7 +199,8 @@ export function parseIngredient(line: string): ParsedIngredient {
   const text = line.trim();
 
   const range = parseLeadingRange(text);
-  const quantity = range ?? parseLeadingQuantity(text);
+  const article = range ? null : parseLeadingArticle(text);
+  const quantity = range ?? parseLeadingQuantity(text) ?? article;
   if (!quantity) {
     return {
       original,
@@ -114,32 +210,27 @@ export function parseIngredient(line: string): ParsedIngredient {
       unit: null,
       unitText: null,
       item: text,
+      articleWord: null,
     };
   }
 
   let rest = text.slice(quantity.length).trimStart();
 
-  // Try the longest unit spellings first, so "cuillère à soupe" is not read as
-  // the shorter "cuillère" with "à soupe" spilling into the item name.
-  let unit: UnitInfo | null = null;
-  let unitText: string | null = null;
-
-  const normalizedRest = normalizeUnitKey(rest);
-  for (const key of UNIT_KEYS) {
-    if (normalizedRest === key || normalizedRest.startsWith(`${key} `)) {
-      unit = lookupUnit(key);
-      // Consume the same number of words from the original text, which may be
-      // spelled with accents the normalized key has lost.
-      const wordCount = key.split(" ").length;
-      const words = rest.split(/\s+/);
-      unitText = words.slice(0, wordCount).join(" ");
-      rest = words.slice(wordCount).join(" ");
-      break;
-    }
-  }
+  const matched = matchLeadingUnit(rest, quantity === article);
+  const unit = matched?.unit ?? null;
+  const unitText = matched?.unitText ?? null;
+  if (matched) rest = matched.rest;
 
   // "200 g de farine" reads better as item "farine" than "de farine".
-  const item = rest.replace(/^(?:de\s+la\s+|de\s+l'|d'|de\s+|du\s+|des\s+)/i, "").trim();
+  //
+  // The article a partitive introduces goes with it: "2/3 d'un flacon" names a
+  // share of one flacon, and once the share has been multiplied the count sits
+  // where "un" stood. Leaving the article behind produces "4 un flacon", which
+  // reads as broken text rather than as a quantity.
+  const item = rest
+    .replace(/^(?:de\s+la\s+|de\s+l'|d'|de\s+|du\s+|des\s+)/i, "")
+    .replace(/^(?:une|un)\s+/i, "")
+    .trim();
 
   return {
     original,
@@ -149,6 +240,7 @@ export function parseIngredient(line: string): ParsedIngredient {
     unit,
     unitText,
     item,
+    articleWord: quantity === article ? (article?.word ?? null) : null,
   };
 }
 

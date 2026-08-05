@@ -265,7 +265,7 @@ describe("get_recipe", () => {
       "1 cuillère à soupe de sucre",
     );
     expect(byOriginal.get("1 pincée de sel")!["text"]).toBe("1 pincée de sel");
-    expect(byOriginal.get("1 pincée de sel")!["scaling"]).toBe("unscaled");
+    expect(byOriginal.get("1 pincée de sel")!["scaling"]).toBe("rounded");
     expect(byOriginal.get("coriandre")!["text"]).toBe("coriandre");
   });
 
@@ -351,7 +351,7 @@ describe("scale_ingredients", () => {
     expect(results).toHaveLength(4);
     expect(results[0]!["text"]).toBe("400 g de farine");
     expect(results[1]!["text"]).toBe("6 oeufs");
-    expect(results[2]!["text"]).toBe("1 pincée de sel");
+    expect(results[2]!["text"]).toBe("2 pincées de sel");
     expect(results[3]!["text"]).toBe("coriandre");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -372,6 +372,32 @@ describe("scale_ingredients", () => {
     const results = out["ingredients"] as Array<Record<string, unknown>>;
     expect(results[0]!["text"]).toBe("100 g de farine");
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("scales a raising agent written as a pinch, along with the rest of the batter", async () => {
+    // A batter for 6 taken to 25: the bicarbonate has to follow the flour, or
+    // the cake will not rise whatever the cook tastes.
+    const { client } = await connect({});
+    const out = structured(
+      await client.callTool({
+        name: "scale_ingredients",
+        arguments: {
+          ingredients: [
+            "200 g de farine",
+            "une pincée de bicarbonate de soude",
+            "1 piment de Cayenne entier",
+          ],
+          from_servings: 6,
+          to_servings: 25,
+        },
+      }),
+    );
+    const results = out["ingredients"] as Array<Record<string, unknown>>;
+    expect(results[1]!["text"]).toBe("4 pincées de bicarbonate de soude");
+    expect(results[1]!["scaling"]).toBe("rounded");
+    expect(results[1]!["note"]).toMatch(/approximate/i);
+    expect(results[2]!["text"]).toBe("4 piments de Cayenne entiers");
+    expect(out["unscaled_count"]).toBe(0);
   });
 
   it("rejects a call that gives neither a factor nor a pair of servings", async () => {

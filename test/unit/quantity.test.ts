@@ -126,6 +126,25 @@ describe("parseIngredient", () => {
     expect(p.item).toBe("sel");
   });
 
+  it("reads the article a recipe writes before an approximate measure", () => {
+    const p = parseIngredient("une pincée de bicarbonate de soude");
+    expect(p.amount).toBe(1);
+    expect(p.articleWord).toBe("une");
+    expect(p.unit?.canonical).toBe("pincée");
+    expect(p.item).toBe("bicarbonate de soude");
+
+    expect(parseIngredient("quelques gouttes de vanille").amount).toBe(3);
+    expect(parseIngredient("un trait de vinaigre").amount).toBe(1);
+  });
+
+  it("leaves an article that stands before a countable thing", () => {
+    // Telling "un oignon" from "un bouquet" takes a noun list this parser has
+    // no business carrying, so the line keeps its published wording.
+    const p = parseIngredient("un oignon");
+    expect(p.amount).toBeNull();
+    expect(p.articleWord).toBeNull();
+  });
+
   it("strips every form of the leading article from the item", () => {
     expect(parseIngredient("200 g de farine").item).toBe("farine");
     expect(parseIngredient("25 cl d'eau").item).toBe("eau");

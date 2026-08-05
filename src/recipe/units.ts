@@ -1,10 +1,10 @@
 /**
  * French cooking unit vocabulary and what scaling means for each.
  *
- * The distinction that matters is not metric versus imperial, it is whether
- * multiplying the number produces something a cook can act on. Doubling "200 g"
- * gives "400 g", which is useful. Doubling "1 pincée" gives "2 pincées", which is
- * noise: a pinch is already "whatever your fingers hold".
+ * The distinction that matters is not metric versus imperial, it is what shape
+ * the scaled number has to take. "200 g" doubled is "400 g". "1 pincée" doubled
+ * is "2 pincées": the pinch keeps whatever size the cook's fingers give it, and
+ * the count is what carries the recipe's proportion.
  */
 
 export type UnitKind =
@@ -12,7 +12,10 @@ export type UnitKind =
   | "measured"
   /** Spoons, cups, sachets: scales, but only to sensible fractions. */
   | "portioned"
-  /** Pinches, dashes, "à volonté": the number carries no real precision. */
+  /**
+   * Pinches, dashes, handfuls: each one has the size the cook gives it, so the
+   * count scales in whole units and the unit itself is never converted.
+   */
   | "vague";
 
 export interface UnitInfo {
@@ -101,7 +104,22 @@ const UNITS: Record<string, UnitInfo> = {
   branche: { canonical: "branche", kind: "portioned" },
   branches: { canonical: "branche", kind: "portioned" },
 
-  // Deliberately imprecise: the number is a figure of speech.
+  // Approximate by nature: the size of one is the cook's, the count is the
+  // recipe's. See `readPartitiveMeasure` for what puts a word here.
+  bouchon: { canonical: "bouchon", kind: "vague" },
+  bouchons: { canonical: "bouchon", kind: "vague" },
+  larme: { canonical: "larme", kind: "vague" },
+  larmes: { canonical: "larme", kind: "vague" },
+  doigt: { canonical: "doigt", kind: "vague" },
+  doigts: { canonical: "doigt", kind: "vague" },
+  nuage: { canonical: "nuage", kind: "vague" },
+  nuages: { canonical: "nuage", kind: "vague" },
+  louche: { canonical: "louche", kind: "vague" },
+  louches: { canonical: "louche", kind: "vague" },
+  lichette: { canonical: "lichette", kind: "vague" },
+  lichettes: { canonical: "lichette", kind: "vague" },
+  pointe: { canonical: "pointe", kind: "vague" },
+  pointes: { canonical: "pointe", kind: "vague" },
   pincee: { canonical: "pincée", kind: "vague", plural: "pincées" },
   pincees: { canonical: "pincée", kind: "vague", plural: "pincées" },
   trait: { canonical: "trait", kind: "vague" },
@@ -112,6 +130,10 @@ const UNITS: Record<string, UnitInfo> = {
   gouttes: { canonical: "goutte", kind: "vague", plural: "gouttes" },
   poignee: { canonical: "poignée", kind: "vague", plural: "poignées" },
   poignees: { canonical: "poignée", kind: "vague", plural: "poignées" },
+  // "noix" carries its own plural mark already.
+  noix: { canonical: "noix", kind: "vague", plural: "noix" },
+  soupcon: { canonical: "soupçon", kind: "vague", plural: "soupçons" },
+  soupcons: { canonical: "soupçon", kind: "vague", plural: "soupçons" },
 };
 
 /**
@@ -136,6 +158,85 @@ export const UNIT_KEYS = Object.keys(UNITS).sort((a, b) => b.length - a.length);
 
 export function lookupUnit(text: string): UnitInfo | null {
   return UNITS[normalizeUnitKey(text)] ?? null;
+}
+
+/**
+ * Words that stand where a measure would and name no container: "un peu de
+ * sel" states that there is some salt, and multiplying it says nothing.
+ */
+const NOT_A_MEASURE = new Set([
+  "peu",
+  "beaucoup",
+  "plus",
+  "moins",
+  "assez",
+  "trop",
+  "autant",
+  "tant",
+  "moitie",
+  "quart",
+  "tiers",
+  "reste",
+  "melange",
+  "ensemble",
+]);
+
+/**
+ * Read a measure a line names with a container or a gesture the vocabulary
+ * above has no entry for.
+ *
+ * What makes a measure approximate is that its size belongs to whoever pours
+ * it: a bouchon, a poignée, a ramequin hold what they hold, and the recipe's
+ * proportion lives in how many are asked for. French marks that grammatically,
+ * by placing the noun between the amount and the partitive that introduces the
+ * thing measured: "un bouchon de rhum", "2 bouquets de persil", "une poignée de
+ * roquette". A noun in that position measures whatever follows it, so a
+ * container nobody thought to list is read by the same rule as the ones that
+ * are, and the vocabulary above only has to carry the words whose plural or
+ * spelling the rule would get wrong.
+ *
+ * The amount has to come first. A line opening on the noun, as in "beurre
+ * pommade", carries no quantity, and inventing one from the grammar would put a
+ * number where the recipe wrote none.
+ */
+export function readPartitiveMeasure(text: string): { unit: UnitInfo; rest: string } | null {
+  const match = /^\s*(\p{L}+)\s+(?=(?:de|du|des)\s|d')/u.exec(text);
+  if (!match) return null;
+
+  const word = match[1]!;
+  if (word.length < 3) return null;
+  if (NOT_A_MEASURE.has(normalizeUnitKey(word))) return null;
+  if (lookupUnit(word)) return null;
+
+  const canonical = frenchSingular(word);
+  return {
+    unit: { canonical, kind: "vague", plural: frenchPlural(canonical) },
+    rest: text.slice(match[0].length),
+  };
+}
+
+/**
+ * The singular of a noun a line wrote in the plural, so the rewrite can put it
+ * back in either number.
+ *
+ * "ananas", "jus" and "anis" carry their -s in the singular, and "morceaux"
+ * comes from "morceau", so the ending decides rather than the last letter
+ * alone.
+ */
+function frenchSingular(word: string): string {
+  if (/eaux$/i.test(word)) return word.slice(0, -1);
+  if (/aux$/i.test(word)) return `${word.slice(0, -3)}al`;
+  if (/[aiou]s$/i.test(word)) return word;
+  if (/s$/i.test(word) && word.length > 3) return word.slice(0, -1);
+  return word;
+}
+
+/** The plural French writes for a noun, or the noun itself when it takes no mark. */
+function frenchPlural(word: string): string {
+  if (/[sxz]$/i.test(word)) return word;
+  if (/eau$/i.test(word)) return `${word}x`;
+  if (/al$/i.test(word)) return `${word.slice(0, -2)}aux`;
+  return `${word}s`;
 }
 
 /**
@@ -197,23 +298,40 @@ export interface ConvertedAmount {
  * percent, well below what any kitchen scale resolves.
  */
 export function convertToReadableUnit(unit: UnitInfo, amount: number): ConvertedAmount {
+  const step = readableUnitStep(unit, amount);
+  if (step.ratio === 1) return { amount, unit };
+  return { amount: Math.round(amount * step.ratio * 100) / 100, unit: step.unit };
+}
+
+/**
+ * The unit `convertToReadableUnit` would move an amount to, and what to
+ * multiply by to get there.
+ *
+ * The ratio is what tells an exact product from a rounded one. Comparing a
+ * result of 2 kg against a product of 2000 g says the value moved when nothing
+ * did, and a line that multiplied cleanly would be reported as rounded.
+ */
+export function readableUnitStep(
+  unit: UnitInfo,
+  amount: number,
+): { unit: UnitInfo; ratio: number } {
   if (unit.kind !== "measured" || !Number.isFinite(amount) || amount <= 0) {
-    return { amount, unit };
+    return { unit, ratio: 1 };
   }
 
   const up = PROMOTIONS[unit.canonical];
   if (up && amount >= up.per) {
     const target = lookupUnit(up.to);
-    if (target) return { amount: Math.round((amount / up.per) * 100) / 100, unit: target };
+    if (target) return { unit: target, ratio: 1 / up.per };
   }
 
   const down = DEMOTIONS[unit.canonical];
   if (down && amount < 1) {
     const target = lookupUnit(down.to);
-    if (target) return { amount: Math.round(amount * down.per * 100) / 100, unit: target };
+    if (target) return { unit: target, ratio: down.per };
   }
 
-  return { amount, unit };
+  return { unit, ratio: 1 };
 }
 
 /**

@@ -4,21 +4,24 @@
  * The guiding rule is that a scaled quantity must be something a cook can act on.
  * Multiplying every number by the factor is arithmetically correct and practically
  * useless: it produces "2,4 oeufs" and "0,67 pincée de sel" with the same
- * confidence as "267 g de farine". Each line is therefore classified, and the
- * classification travels with the result so the caller can see what was computed
- * and what was left alone.
+ * confidence as "267 g de farine". Each line is therefore classified by what its
+ * unit allows, and the classification travels with the result so the caller can
+ * see what was computed and how.
  */
 
 import { formatAmount, parseIngredient } from "./quantity.js";
 import type { UnitInfo } from "./units.js";
-import { convertToReadableUnit, demoteUnit, formatUnit } from "./units.js";
+import { demoteUnit, formatUnit, readableUnitStep } from "./units.js";
 
 export type ScalingKind =
-  /** Multiplied and rounded to a readable value. */
+  /** The arithmetic was exact. */
   | "scaled"
-  /** Multiplied, then rounded to something countable. */
+  /**
+   * A countable item was moved to a whole or a half, or a measurement was
+   * rounded to what a scale can show.
+   */
   | "rounded"
-  /** Left untouched: no amount, or an amount too vague to be meaningful. */
+  /** Left untouched: the line carries no amount at all. */
   | "unscaled";
 
 export interface ScaledIngredient {
@@ -38,11 +41,8 @@ export interface ScaledIngredient {
   unit: string | null;
   scaling: ScalingKind;
   /**
-   * Whether rounding moved the value away from the exact product.
-   *
-   * Read this rather than `scaling` to know if a number was touched: a line can
-   * be classified `rounded` and still land on the exact result, as three eggs
-   * doubled land on six.
+   * Whether rounding moved the value away from the exact product, which is what
+   * makes a line `rounded` rather than `scaled`.
    */
   adjusted: boolean;
   /** Why the line was left alone, when it was. */
@@ -69,6 +69,9 @@ function roundMeasured(value: number): number {
 
 /** Below this there is nothing a kitchen can measure out of a countable thing. */
 const SMALLEST_USABLE_FRACTION = 0.25;
+
+/** The largest gap that still counts as landing on the exact product. */
+const EXACT_WITHIN = 0.01;
 
 interface CountableResult {
   value: number;
@@ -110,6 +113,26 @@ function roundCountable(value: number, allowHalves: boolean, ceiling: number): C
 }
 
 /**
+ * Scale the count of an approximate measure.
+ *
+ * A pinch, a handful or a drizzle has the size the cook's hand gives it, so the
+ * proportion of the recipe lives in how many of them are asked for: a batter for
+ * six raised by one pinch of bicarbonate needs four of them for twenty-five.
+ * The count therefore multiplies like any other, in whole units, and the measure
+ * stays in its own vocabulary rather than being turned into grams or spoons,
+ * where published equivalences span a fourfold range.
+ *
+ * One is the floor when shrinking, since half a pinch is not something a hand
+ * can produce, and the bound stops a shrunk line from asking for more than the
+ * recipe wrote.
+ */
+function scaleApproximateCount(source: number, raw: number, factor: number): number {
+  if (raw <= 0) return 0;
+  const whole = Math.max(1, Math.round(raw));
+  return factor < 1 ? Math.min(whole, source) : Math.max(whole, source);
+}
+
+/**
  * Round a measured amount in the smallest unit that still holds it whole.
  *
  * Rounding before converting throws away the precision the conversion was going
@@ -121,7 +144,7 @@ function roundCountable(value: number, allowHalves: boolean, ceiling: number): C
 function roundMeasuredInUsableUnit(
   unit: UnitInfo,
   raw: number,
-): { amount: number; unit: UnitInfo } {
+): { amount: number; unit: UnitInfo; exact: number } {
   let current = unit;
   let value = raw;
 
@@ -135,9 +158,17 @@ function roundMeasuredInUsableUnit(
   const rounded = roundMeasured(value);
   // At the bottom of the ladder, keep what precision is left rather than
   // deleting the ingredient.
+  const amount = rounded === 0 && value > 0 ? Number(value.toPrecision(2)) : rounded;
+
+  // A large amount reads better one unit up, and the exact product travels to
+  // that unit with it: 2000 g and 2 kg are the same quantity, and comparing one
+  // against the other would report a value as moved when it never was.
+  const step = readableUnitStep(current, amount);
+  if (step.ratio === 1) return { amount, unit: current, exact: value };
   return {
-    amount: rounded === 0 && value > 0 ? Number(value.toPrecision(2)) : rounded,
-    unit: current,
+    amount: Math.round(amount * step.ratio * 100) / 100,
+    unit: step.unit,
+    exact: value * step.ratio,
   };
 }
 
@@ -163,28 +194,95 @@ function agreeWithAmount(item: string, amount: number): string {
   if (head.length <= 3) return item;
 
   const wantsPlural = amount >= 2;
-  const isPlural = /s$/i.test(head);
+  const isPlural = /s$|eaux$|aux$/i.test(head);
 
   if (wantsPlural && !isPlural) {
     // Words ending in -s, -x or -z do not take a plural mark.
     if (/[sxz]$/i.test(head)) return item;
-    words[0] = `${head}s`;
+    // "morceau" and "bocal" take -x and -aux where the ordinary noun takes -s.
+    if (/eau$/i.test(head)) words[0] = `${head}x`;
+    else if (/al$/i.test(head)) words[0] = `${head.slice(0, -2)}aux`;
+    else words[0] = `${head}s`;
   } else if (!wantsPlural && isPlural) {
+    if (/eaux$/i.test(head)) words[0] = head.slice(0, -1);
+    else if (/aux$/i.test(head)) words[0] = `${head.slice(0, -3)}al`;
     // "ananas", "anis", "couscous": the -s belongs to the singular.
-    if (/[aiou]s$/i.test(head)) return item;
-    words[0] = head.slice(0, -1);
+    else if (/[aiou]s$/i.test(head)) return item;
+    else words[0] = head.slice(0, -1);
+  }
+
+  const last = words.length - 1;
+  if (last > 0) {
+    const adjective = agreeTrailingAdjective(words[last]!, wantsPlural);
+    if (adjective) words[last] = adjective;
   }
 
   return words.join(" ");
 }
 
 /**
- * Scale one ingredient line.
+ * Adjectives a recipe puts after the noun, and which take a plain -s.
  *
- * Whole eggs and other countable items are rounded up to a usable amount rather
- * than being reported as fractions, and vague measures such as pinches are
- * returned untouched with a note.
+ * A French adjective agrees with the noun it qualifies, so "1 piment entier"
+ * counted four times reads "4 piments entiers". Only this list is declined: an
+ * unknown trailing word can be a brand ("Golden"), a proper noun ("Cayenne") or
+ * a phrase whose head sits elsewhere, and a word left as the recipe wrote it
+ * reads as faithful where an invented ending reads as wrong.
  */
+const AGREEABLE_ADJECTIVES = new Set([
+  "entier",
+  "entiere",
+  "moyen",
+  "moyenne",
+  "petit",
+  "petite",
+  "grand",
+  "grande",
+  "mur",
+  "mure",
+  "vert",
+  "verte",
+  "rouge",
+  "jaune",
+  "noir",
+  "noire",
+  "blanc",
+  "blanche",
+  "rond",
+  "ronde",
+  "hache",
+  "hachee",
+  "coupe",
+  "coupee",
+  "rape",
+  "rapee",
+  "pele",
+  "pelee",
+  "epluche",
+  "epluchee",
+  "denoyaute",
+  "denoyautee",
+  "emince",
+  "emincee",
+]);
+
+/** Lowercase and strip accents, so "entière" and "entiere" hit the same entry. */
+function foldWord(word: string): string {
+  return word.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+/** The trailing adjective agreed with the count, or null when it is left alone. */
+function agreeTrailingAdjective(word: string, wantsPlural: boolean): string | null {
+  const folded = foldWord(word);
+  const isPlural = folded.endsWith("s");
+  const singular = isPlural ? word.slice(0, -1) : word;
+
+  if (!AGREEABLE_ADJECTIVES.has(foldWord(singular))) return null;
+  if (wantsPlural === isPlural) return null;
+
+  return wantsPlural ? `${word}s` : singular;
+}
+
 /**
  * "de" becomes "d'" before a vowel sound.
  *
@@ -205,8 +303,8 @@ function joinItem(item: string): string {
  * Scale one ingredient line.
  *
  * Countable items are rounded to something a kitchen can measure, ranges are
- * scaled at both ends, and vague measures such as pinches are returned
- * untouched with a note.
+ * scaled at both ends, and approximate measures such as pinches scale by their
+ * count, with a note saying so. A line carrying no amount comes back as it was.
  */
 export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngredient {
   const { factor } = options;
@@ -226,26 +324,29 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
 
   const kind = parsed.unit?.kind ?? "countable";
 
-  if (kind === "vague") {
-    return {
-      original: parsed.original,
-      text: parsed.original,
-      amount: parsed.amount,
-      unit: parsed.unit?.canonical ?? null,
-      scaling: "unscaled",
-      adjusted: false,
-      note: "Measure is approximate by nature; adjust to taste.",
-    };
-  }
-
   /** Scale one bound, keeping it at or below what the recipe already asked for. */
   const scaleBound = (source: number) => {
     const raw = source * factor;
 
+    if (kind === "vague") {
+      return {
+        amount: scaleApproximateCount(source, raw, factor),
+        unit: parsed.unit,
+        exact: raw,
+        raw,
+        clamped: false,
+      };
+    }
+
     if (kind === "measured") {
       const converted = roundMeasuredInUsableUnit(parsed.unit!, raw);
-      const readable = convertToReadableUnit(converted.unit, converted.amount);
-      return { amount: readable.amount, unit: readable.unit, raw, clamped: false };
+      return {
+        amount: converted.amount,
+        unit: converted.unit,
+        exact: converted.exact,
+        raw,
+        clamped: false,
+      };
     }
 
     // Spoons tolerate halves; boxes, sachets and eggs do not.
@@ -253,7 +354,13 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
     // Scaling down must never end up asking for more than the original.
     const ceiling = factor < 1 ? source : Number.POSITIVE_INFINITY;
     const rounded = roundCountable(raw, allowHalves, ceiling);
-    return { amount: rounded.value, unit: parsed.unit, raw, clamped: rounded.clamped };
+    return {
+      amount: rounded.value,
+      unit: parsed.unit,
+      exact: raw,
+      raw,
+      clamped: rounded.clamped,
+    };
   };
 
   const low = scaleBound(parsed.amount);
@@ -263,7 +370,6 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
   // a range in `amount` would be read as the whole answer.
   const amount = high?.amount ?? low.amount;
   const unit = high?.unit ?? low.unit;
-  const scaling: ScalingKind = kind === "measured" ? "scaled" : "rounded";
 
   const unitLabel = unit ? ` ${formatUnit(unit, amount)}` : "";
   // A counted item agrees with its number: "1/3 oeuf", "3 brioches".
@@ -283,7 +389,13 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
   const text = `${amountText}${unitLabel}${item}`.trim();
 
   const bounds = high === null ? [low] : [low, high];
-  const adjusted = bounds.some((bound) => Math.abs(bound.raw - bound.amount) > 0.01);
+  const adjusted = bounds.some((bound) => Math.abs(bound.exact - bound.amount) > EXACT_WITHIN);
+  const clamped = bounds.some((bound) => bound.clamped);
+  // A line is `scaled` when the number it now carries is the product itself.
+  // What the unit allows decides whether rounding was needed, and a count that
+  // lands whole on its own needed none: one pinch six times over is six
+  // pinches, as exactly as six hundred grams are six times a hundred.
+  const scaling: ScalingKind = adjusted || clamped ? "rounded" : "scaled";
 
   const result: ScaledIngredient = {
     original: parsed.original,
@@ -294,16 +406,47 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
     adjusted,
   };
 
-  if (bounds.some((bound) => bound.clamped)) {
+  if (kind === "vague") {
+    const one = unit ? formatUnit(unit, 1) : "measure";
+    const many = unit ? formatUnit(unit, 2) : "measures";
+    const sentences: string[] = [];
+    if (parsed.articleWord) {
+      sentences.push(`"${parsed.articleWord}" read as ${formatAmount(parsed.amount)}.`);
+    }
+    sentences.push(
+      `${APPROXIMATE_MEASURE_MARKER} the number of ${many} was multiplied, and one ${one} ` +
+        "keeps the size the cook gives it.",
+    );
+    if (adjusted) sentences.push(`Rounded from ${formatAmount(Math.round(low.raw * 100) / 100)}.`);
+    result.note = sentences.join(" ");
+  } else if (bounds.some((bound) => bound.clamped)) {
     result.note =
       `Clamped up to ${formatAmount(SMALLEST_USABLE_FRACTION)} from ` +
       `${formatAmount(Math.round(low.raw * 1000) / 1000)}, the smallest amount worth measuring. ` +
       "This line no longer holds its share of the recipe.";
-  } else if (scaling === "rounded" && adjusted) {
+  } else if (adjusted) {
     result.note = `Rounded from ${formatAmount(Math.round(low.raw * 100) / 100)}.`;
   }
 
+  // A line that wrote its amount as a word says which word it was, so a caller
+  // can see the figure came from the grammar rather than from a digit.
+  if (kind !== "vague" && parsed.articleWord) {
+    const read = `"${parsed.articleWord}" read as ${formatAmount(parsed.amount)}.`;
+    result.note = result.note ? `${read} ${result.note}` : read;
+  }
+
   return result;
+}
+
+/** Opening of the note an approximate measure carries. */
+const APPROXIMATE_MEASURE_MARKER = "Approximate measure:";
+
+/**
+ * Whether this line was scaled as an approximate measure, so a caller can say
+ * so once for a whole list instead of reading every note.
+ */
+export function isApproximateMeasure(entry: ScaledIngredient): boolean {
+  return entry.note?.includes(APPROXIMATE_MEASURE_MARKER) ?? false;
 }
 
 export function scaleIngredients(lines: string[], options: ScaleOptions): ScaledIngredient[] {

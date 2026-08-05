@@ -69,24 +69,43 @@ Asking a language model to divide a recipe by 1.5 tends to produce "2.4 eggs" an
 server does the arithmetic itself and, more importantly, **says what it could not
 compute**. Every ingredient comes back with a `scaling` flag:
 
-| Flag       | Meaning                                          | Example at factor 0.667           |
-| ---------- | ------------------------------------------------ | --------------------------------- |
-| `scaled`   | Multiplied and rounded to a readable value.      | `25 cl de lait` → `17 cl de lait` |
-| `rounded`  | Multiplied, then rounded to something countable. | `3 oeufs` → `2 oeufs`             |
-| `unscaled` | Left exactly as published.                       | `1 pincée de sel`, `coriandre`    |
+| Flag       | Meaning                                            | Example                                  |
+| ---------- | -------------------------------------------------- | ---------------------------------------- |
+| `scaled`   | The value is the product itself.                   | `3 oeufs` ×2 → `6 oeufs`                 |
+| `rounded`  | The value had to be moved to stay usable.          | `25 cl de lait` ×0.667 → `17 cl de lait` |
+| `unscaled` | Carries no quantity, so left exactly as published. | `sel`, `coriandre`                       |
+
+A count reaches an exact product as readily as a mass does: one pinch multiplied
+by six is six pinches, and that line is `scaled`. `rounded` is for a value that
+landed somewhere the arithmetic did not put it, a half egg taken to a whole one
+or 133.4 g written as 135 g.
 
 Two rules are enforced. Scaling a recipe **down never asks for more** than the
 original: half a sachet at factor 0.667 becomes a third of a sachet, never a whole
 one. And scaling never **silently drops** an ingredient by rounding it to zero,
 which is why small amounts come back as fractions.
 
+Approximate measures are quantities too. A pinch, a handful, a bouchon or a
+ramequin has the size the cook gives it, and the recipe's proportion lives in how
+many are asked for, so the count is multiplied in whole units: `une pincée de
+bicarbonate de soude` from 6 servings to 25 comes back as `4 pincées de
+bicarbonate de soude`, carrying a note. Nothing is ever
+converted into grams or spoons, where published equivalences span a fourfold
+range; an order of magnitude belongs in a note, never in the quantity.
+
 Ranges are read as one quantity: "2 à 3 gousses" doubled reads "4 à 6 gousses",
 and `amount` reports the upper bound, since that is what a cook buys.
 
-Each ingredient also carries `adjusted`, which says whether rounding actually
-moved the number. A line can be `rounded` and still land exactly, as three eggs
-doubled land on six, so read `adjusted` rather than the flag when what you want
-to know is whether a quantity was touched.
+A line that writes an article where a digit would go is read as one of the
+measure that follows it: `un bouchon de rhum` scaled sixfold is
+`6 bouchons de rhum`, and the note says which word the figure came from. A noun
+sitting between the amount and the `de` that introduces what is measured names a
+container or a gesture, which is how a measure the vocabulary has never met is
+still read. An article before a bare countable thing, as in `un oignon`, leaves
+the line as published.
+
+Each ingredient also carries `adjusted`, which says whether rounding moved the
+number away from the exact product.
 
 Below a quarter there is nothing a kitchen can measure, so the amount is clamped
 up and **the line stops holding its share of the recipe**. Half a sachet of
@@ -262,25 +281,45 @@ et « 0,67 pincée de sel », énoncés avec le même aplomb qu'un chiffre juste
 serveur fait le calcul lui-même et, surtout, **signale ce qu'il n'a pas pu
 calculer**. Chaque ingrédient porte un indicateur `scaling` :
 
-| Indicateur | Sens                                              | Exemple au facteur 0,667          |
-| ---------- | ------------------------------------------------- | --------------------------------- |
-| `scaled`   | Multiplié et arrondi à une valeur lisible.        | `25 cl de lait` → `17 cl de lait` |
-| `rounded`  | Multiplié, puis arrondi à une valeur dénombrable. | `3 oeufs` → `2 oeufs`             |
-| `unscaled` | Laissé exactement tel que publié.                 | `1 pincée de sel`, `coriandre`    |
+| Indicateur | Sens                                                 | Exemple                                  |
+| ---------- | ---------------------------------------------------- | ---------------------------------------- |
+| `scaled`   | La valeur est le produit exact.                      | `3 oeufs` ×2 → `6 oeufs`                 |
+| `rounded`  | La valeur a dû être déplacée pour rester utilisable. | `25 cl de lait` ×0,667 → `17 cl de lait` |
+| `unscaled` | Ne porte aucune quantité, laissé tel que publié.     | `sel`, `coriandre`                       |
+
+Un décompte tombe juste aussi bien qu'une masse : une pincée multipliée par six
+fait six pincées, et cette ligne est `scaled`. `rounded` désigne une valeur posée
+ailleurs que là où le calcul la mettait, un demi-œuf ramené à un œuf entier ou
+133,4 g écrits 135 g.
 
 Deux règles sont garanties. Réduire une recette **ne demande jamais davantage** que
 l'originale : un demi-sachet au facteur 0,667 devient un tiers de sachet, jamais un
 sachet entier. Et l'adaptation ne **supprime jamais** un ingrédient en l'arrondissant
 à zéro, d'où les fractions pour les petites quantités.
 
+Les mesures approximatives sont des quantités elles aussi. Une pincée, une
+poignée, un bouchon ou un ramequin ont la taille que le cuisinier leur donne,
+et la proportion de la recette tient au nombre demandé : ce nombre est donc
+multiplié, en unités entières. « une pincée de bicarbonate de soude » de 6 à 25
+parts revient en « 4 pincées de bicarbonate de soude », accompagnée d'une
+note. Aucune conversion en grammes ni en cuillères : les
+équivalences publiées varient du simple au quadruple, et un ordre de grandeur a
+sa place dans une note, jamais dans la quantité.
+
 Les fourchettes sont lues comme une seule quantité : « 2 à 3 gousses » doublé
 donne « 4 à 6 gousses », et `amount` renvoie la borne haute, celle que l'on
 achète.
 
-Chaque ingrédient porte aussi `adjusted`, qui dit si l'arrondi a réellement
-déplacé le nombre. Une ligne peut être `rounded` et tomber juste, comme trois
-œufs doublés qui font six, donc lisez `adjusted` plutôt que l'indicateur quand
-la question est de savoir si une quantité a été touchée.
+Une ligne qui écrit un article là où irait un chiffre est lue comme une unité de
+la mesure qui suit : « un bouchon de rhum » multiplié par six donne « 6 bouchons
+de rhum », et la note indique de quel mot vient le chiffre. Un nom placé entre la
+quantité et le « de » qui introduit ce qui est mesuré désigne un contenant ou un
+geste, ce qui permet de lire une mesure absente du vocabulaire. Un article devant
+une chose dénombrable seule, comme « un oignon », laisse la ligne telle que
+publiée.
+
+Chaque ingrédient porte aussi `adjusted`, qui dit si l'arrondi a déplacé le
+nombre par rapport au produit exact.
 
 Sous un quart, il n'y a plus rien qu'une cuisine puisse mesurer : la quantité est
 alors remontée et **la ligne cesse de tenir sa part de la recette**. Un demi-sachet
