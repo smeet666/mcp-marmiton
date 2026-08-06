@@ -10,8 +10,14 @@
  */
 
 import { formatAmount, parseIngredient } from "./quantity.js";
-import type { UnitInfo } from "./units.js";
-import { demoteUnit, formatUnit, readableUnitStep } from "./units.js";
+import type { Divisibility, UnitInfo } from "./units.js";
+import {
+  demoteUnit,
+  formatUnit,
+  isSpoonMeasure,
+  readableUnitStep,
+  unitDivisibility,
+} from "./units.js";
 
 export type ScalingKind =
   /** The arithmetic was exact. */
@@ -67,8 +73,57 @@ function roundMeasured(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/** Below this there is nothing a kitchen can measure out of a countable thing. */
+/** Below this there is nothing a kitchen can measure out of a spoonful. */
 const SMALLEST_USABLE_FRACTION = 0.25;
+
+/** The smallest share of one thing that is still worth putting in a bowl. */
+const SMALLEST_USABLE: Record<Divisibility, number> = {
+  whole: 1,
+  half: 0.5,
+  quarter: 0.25,
+};
+
+/** True when a number is a whole or a half, to the last bit of precision. */
+function isHalfStep(value: number): boolean {
+  return Math.abs(value * 2 - Math.round(value * 2)) < 1e-9;
+}
+
+/**
+ * Produce a knife divides as far as quarters, so a quarter of an oignon is an
+ * amount. Anything else counted goes as far as the half.
+ *
+ * The list is read on an item stripped of its accents, so "échalote" and
+ * "echalote" hit the same entry.
+ */
+const QUARTERED_ITEM =
+  /\b(oignons?|echalotes?|pommes? de terre|pommes?|poires?|carottes?|citrons?|oranges?|tomates?|concombres?|courgettes?|aubergines?|courges?|potirons?|choux?|melons?|poivrons?|betteraves?|navets?|panais)\b/;
+
+/**
+ * Things a kitchen takes one of or none of.
+ *
+ * An oeuf comes out of its shell whole, and so does the jaune or the blanc a
+ * recipe asks for on its own: half of one would have to be beaten and weighed,
+ * which is not an amount any recipe asks for and not one a cook can keep the
+ * rest of. A count of them therefore lands on a whole number, whichever side of
+ * the half the arithmetic fell on.
+ *
+ * "blanc" alone names a chicken breast or the white of a leek as readily as the
+ * white of an egg, so it counts here only when the line says which one it is.
+ */
+const WHOLE_ITEM = /\b(oeufs?|jaunes?|blancs? d ?(oeufs?))\b/;
+
+/** How finely the thing a line counts can be divided. */
+function divisibilityOf(unit: UnitInfo | null, item: string): Divisibility {
+  if (unit) return unitDivisibility(unit);
+  const key = item
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/œ/g, "oe")
+    .replace(/['’]/g, " ");
+  if (WHOLE_ITEM.test(key)) return "whole";
+  return QUARTERED_ITEM.test(key) ? "quarter" : "half";
+}
 
 /** The largest gap that still counts as landing on the exact product. */
 const EXACT_WITHIN = 0.01;
@@ -80,19 +135,64 @@ interface CountableResult {
 }
 
 /**
- * Round a countable amount to something a cook can act on.
+ * Round a counted thing to an amount a kitchen produces.
  *
- * Below one whole unit the amount snaps to a fraction a kitchen can measure: a
- * raw 0,15 of an egg is no more usable than zero. One whole is among the
- * candidates, so an egg shrunk to 0,9 comes back as one egg rather than three
- * quarters of one, and the ceiling stops that from ever asking for more than
- * the recipe started with.
+ * A count lands on a whole. The one exception is a share that comes out on a
+ * half by itself, for a thing that divides in two: half a boîte de tomates is a
+ * real amount, and rounding it up to a whole adds a sixth of the tomatoes to a
+ * recipe that asked for three boîtes.
  *
- * A quarter is the floor. Under it the amount is clamped up rather than shrunk
- * towards nothing, which keeps the ingredient in the recipe at the cost of its
- * proportion, and the caller is told through `clamped`.
+ * How finely the thing divides decides the floor. Under that floor the amount is
+ * clamped up rather than shrunk towards nothing, which keeps the ingredient in
+ * the recipe at the cost of its proportion, and the caller is told through
+ * `clamped`. The ceiling stops a shrinking recipe from ever asking for more than
+ * it started with.
  */
-function roundCountable(value: number, allowHalves: boolean, ceiling: number): CountableResult {
+function roundCountable(
+  value: number,
+  divisibility: Divisibility,
+  ceiling: number,
+): CountableResult {
+  if (value <= 0) return { value: 0, clamped: false };
+
+  const floor = SMALLEST_USABLE[divisibility];
+
+  if (divisibility !== "whole" && value >= floor && isHalfStep(value)) {
+    return { value, clamped: false };
+  }
+
+  if (divisibility === "whole") {
+    // Below the halfway mark the nearest whole is none, and dropping the
+    // ingredient is worse than overstating it, so the line keeps one and says it
+    // no longer holds its share.
+    if (value < 0.5) return { value: floor, clamped: true };
+    return { value: Math.round(value), clamped: false };
+  }
+
+  if (value < floor) return { value: floor, clamped: true };
+
+  if (value < 1) {
+    // A knife takes a vegetable to quarters and thirds; anything else offers the
+    // half it can be split on.
+    const steps = divisibility === "quarter" ? [0.25, 1 / 3, 0.5, 2 / 3, 0.75, 1] : [0.5, 1];
+    const candidates = steps.filter(
+      (candidate) => candidate >= floor && candidate <= Math.max(ceiling, floor),
+    );
+    let closest = candidates[0]!;
+    for (const candidate of candidates) {
+      if (Math.abs(value - candidate) < Math.abs(value - closest)) closest = candidate;
+    }
+    return { value: Math.round(closest * 100) / 100, clamped: false };
+  }
+
+  return { value: Math.round(value), clamped: false };
+}
+
+/**
+ * Round a spoon, a glass or a bowl, which a kitchen measures out in halves and
+ * in the fractions printed on a measuring set.
+ */
+function roundSpoon(value: number, ceiling: number): CountableResult {
   if (value <= 0) return { value: 0, clamped: false };
 
   if (value < 1) {
@@ -109,7 +209,7 @@ function roundCountable(value: number, allowHalves: boolean, ceiling: number): C
     };
   }
 
-  return { value: allowHalves ? roundTo(value, 0.5) : Math.round(value), clamped: false };
+  return { value: roundTo(value, 0.5), clamped: false };
 }
 
 /**
@@ -349,11 +449,12 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
       };
     }
 
-    // Spoons tolerate halves; boxes, sachets and eggs do not.
-    const allowHalves = /cuillère|verre|tasse|bol/.test(parsed.unit?.canonical ?? "");
     // Scaling down must never end up asking for more than the original.
     const ceiling = factor < 1 ? source : Number.POSITIVE_INFINITY;
-    const rounded = roundCountable(raw, allowHalves, ceiling);
+    const rounded =
+      parsed.unit && isSpoonMeasure(parsed.unit)
+        ? roundSpoon(raw, ceiling)
+        : roundCountable(raw, divisibilityOf(parsed.unit, parsed.item), ceiling);
     return {
       amount: rounded.value,
       unit: parsed.unit,
@@ -419,11 +520,15 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
     );
     if (adjusted) sentences.push(`Rounded from ${formatAmount(Math.round(low.raw * 100) / 100)}.`);
     result.note = sentences.join(" ");
-  } else if (bounds.some((bound) => bound.clamped)) {
+  } else if (clamped) {
+    // Name the floor this line actually landed on: how far one of the thing
+    // divides is what sets it, so a sachet stops at a half where an oignon goes
+    // to a quarter.
+    const floored = bounds.find((bound) => bound.clamped)!;
     result.note =
-      `Clamped up to ${formatAmount(SMALLEST_USABLE_FRACTION)} from ` +
-      `${formatAmount(Math.round(low.raw * 1000) / 1000)}, the smallest amount worth measuring. ` +
-      "This line no longer holds its share of the recipe.";
+      `Clamped up to ${formatAmount(floored.amount)} from ` +
+      `${formatAmount(Math.round(floored.raw * 1000) / 1000)}, the smallest amount worth ` +
+      "measuring. This line no longer holds its share of the recipe.";
   } else if (adjusted) {
     result.note = `Rounded from ${formatAmount(Math.round(low.raw * 100) / 100)}.`;
   }

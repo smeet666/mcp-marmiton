@@ -334,6 +334,44 @@ export function readableUnitStep(
   return { unit, ratio: 1 };
 }
 
+/** How finely a kitchen can divide one of a counted thing. */
+export type Divisibility =
+  /** An oeuf: half of one is not an amount a kitchen measures out. */
+  | "whole"
+  /** A boîte, a gousse, a feuille de gélatine: it splits in two, and no finer. */
+  | "half"
+  /** An oignon, a pomme: a knife takes it to quarters. */
+  | "quarter";
+
+/**
+ * How finely a unit divides, decided by what one of them holds rather than by
+ * what holds it.
+ *
+ * The question is whether half of one is a quantity a cook can take: a boîte de
+ * tomates is poured and the rest kept, a sachet de sucre vanillé is split by
+ * eye, a feuille de gélatine is cut with scissors, a branche de thym is pinched
+ * in two. Content that pours, weighs or cuts therefore divides, and the word for
+ * the packaging settles nothing. What stays whole is what half of cannot be
+ * measured out at all, and the egg is the case that names the rule: half of one
+ * would have to be beaten and weighed, which is not what a recipe asks for. That
+ * test belongs to the thing being counted, so it lives with the item in
+ * `scale.ts`.
+ *
+ * A gesture keeps its own answer: half a pincée is a fraction of a hand, and the
+ * count is the whole of what a pincée can say.
+ */
+export function unitDivisibility(unit: UnitInfo): Divisibility {
+  return unit.kind === "vague" ? "whole" : "half";
+}
+
+/**
+ * Spoons, glasses and bowls: a portion of a fixed size, which a kitchen measures
+ * out in the fractions printed on a measuring set rather than in halves alone.
+ */
+export function isSpoonMeasure(unit: UnitInfo): boolean {
+  return /^(cuillère à soupe|cuillère à café|verre|tasse|bol)$/.test(unit.canonical);
+}
+
 /**
  * Render a unit for a given amount, choosing singular or plural.
  *

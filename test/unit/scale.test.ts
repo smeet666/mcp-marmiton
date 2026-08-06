@@ -145,7 +145,7 @@ describe("scaleIngredient — portioned units tolerate halves only where a cook 
     expect(r.text).not.toMatch(/cuillères/);
   });
 
-  it("keeps a sachet whole: half a sachet cannot come from rounding up", () => {
+  it("doubles half a sachet into exactly one", () => {
     const r = scaleIngredient("1/2 sachet de levure", { factor: 2 });
     expect(r.amount).toBe(1);
     expect(r.text).toBe("1 sachet de levure");
@@ -156,9 +156,13 @@ describe("scaleIngredient — portioned units tolerate halves only where a cook 
     expect(scaleIngredient("2 sachets de levure", { factor: 0.5 }).text).toBe("1 sachet de levure");
   });
 
-  it("does not allow a half gousse d'ail", () => {
+  // This test used to forbid a half gousse d'ail outright. A clove is cut in
+  // two with the same knife that peels it; what makes this line whole is the
+  // product itself, 2,001, and not a rule against halves.
+  it("keeps a count on the whole the product landed on", () => {
     const r = scaleIngredient("3 gousses d'ail", { factor: 0.667 });
     expect(Number.isInteger(r.amount)).toBe(true);
+    expect(scaleIngredient("3 gousses d'ail", { factor: 0.5 }).amount).toBe(1.5);
   });
 });
 
@@ -182,8 +186,10 @@ describe("scaleIngredient — a counted item agrees with its amount both ways", 
   });
 
   it("uses the singular below one, where French does", () => {
-    // 3 x 0.1 = 0.3, whose nearest usable fraction is a third.
-    expect(scaleIngredient("3 oeufs", { factor: 0.1 }).text).toBe("1/3 oeuf");
+    // A knife takes an apple to quarters and thirds: 3 x 0.1 = 0.3, whose
+    // nearest usable share is a third. This test used to read the same figure
+    // off "3 oeufs", which a kitchen has no way of cutting into thirds.
+    expect(scaleIngredient("3 pommes", { factor: 0.1 }).text).toBe("1/3 pomme");
     expect(scaleIngredient("1 brioche", { factor: 0.5 }).text).toBe("1/2 brioche");
   });
 
@@ -498,6 +504,6 @@ describe("scaleIngredient — mass and volume read as decimals, not fractions", 
     expect(scaleIngredient("2 cuillères à soupe de sucre", { factor: 0.667 }).text).toContain(
       "1/2",
     );
-    expect(scaleIngredient("3 oeufs", { factor: 0.1 }).text).toContain("1/3");
+    expect(scaleIngredient("1 boîte de tomates", { factor: 0.5 }).text).toContain("1/2");
   });
 });

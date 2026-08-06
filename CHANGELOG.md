@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.6.0
+
+- A counted container is divided by what it holds rather than by what holds it. A
+  boîte, a pot, une brique, un sachet, une feuille de gélatine and une branche
+  were rounded to whole units: `1 boîte de tomates` taken to two fifths came back
+  as a third of a boîte, and three sachets halved came back as two. Half of each
+  of those can be poured, weighed or cut out and the rest kept, so they now land
+  on a half, as a gousse d'ail does: `1 boîte de tomates` at 0,4 reads
+  `1/2 boîte de tomates`, and `3 sachets` halved read `1 1/2 sachet`.
+- What stays whole is what half of cannot be measured out at all. An oeuf, a
+  jaune d'oeuf and a blanc d'oeuf are counted whole: `3 oeufs` reduced to a tenth
+  came back as `1/3 oeuf`, a third of an egg being something no recipe asks a
+  cook to produce, and now comes back as `1 oeuf` with the note saying the line
+  no longer holds its share. `3 oeufs` taken from six servings to twenty-five is
+  still 13 oeufs.
+- The floor a shrinking line is clamped up to follows the same rule instead of
+  being a quarter for everything: a quarter for produce a knife divides, such as
+  un oignon or une pomme, a half for a container or a gousse, one whole for an
+  oeuf. The clamp note names the floor the line landed on.
+
 ## 1.5.0
 
 - Read an approximate measure from the shape of the line as well as from the

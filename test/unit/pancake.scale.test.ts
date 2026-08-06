@@ -56,6 +56,38 @@ describe("an approximate measure the vocabulary has not met", () => {
   });
 });
 
+describe("the whole batter, from four eaters to twenty-four", () => {
+  const BATTER = [
+    "une pincée de sel",
+    "1 cuillère à café de sucre",
+    "1 cuillère à soupe de beurre pommade",
+    "1 dose (cup) de Mountain Dew",
+    "6 oeufs",
+    "1 kilo de farine",
+    "2/3 d'un flacon de fleur d'oranger",
+    "3 sucres vanillés (sachets)",
+    "un bouchon de rhum",
+    "1/4 litre de lait",
+  ];
+
+  it("multiplies every line by six and calls each one exact", () => {
+    const lines = BATTER.map((line) => scale(line, 6));
+    expect(lines.map((entry) => entry.text)).toEqual([
+      "6 pincées de sel",
+      "6 cuillères à café de sucre",
+      "6 cuillères à soupe de beurre pommade",
+      "6 doses (cup) de Mountain Dew",
+      "36 oeufs",
+      "6 kg de farine",
+      "4 flacons de fleur d'oranger",
+      "18 sucres vanillés (sachets)",
+      "6 bouchons de rhum",
+      "1,5 l de lait",
+    ]);
+    for (const entry of lines) expect(entry.scaling, entry.original).toBe("scaled");
+  });
+});
+
 describe("the label an exact multiplication carries", () => {
   it("calls a whole-number product scaled", () => {
     for (const line of [

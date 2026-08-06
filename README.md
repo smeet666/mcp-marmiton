@@ -81,9 +81,16 @@ landed somewhere the arithmetic did not put it, a half egg taken to a whole one
 or 133.4 g written as 135 g.
 
 Two rules are enforced. Scaling a recipe **down never asks for more** than the
-original: half a sachet at factor 0.667 becomes a third of a sachet, never a whole
-one. And scaling never **silently drops** an ingredient by rounding it to zero,
-which is why small amounts come back as fractions.
+original: half a sachet at factor 0.667 stays half a sachet, never a whole one.
+And scaling never **silently drops** an ingredient by rounding it to zero, which
+is why small amounts come back as fractions.
+
+**A counted thing is divided by what it holds, not by what holds it.** A boîte de
+tomates is poured and the rest kept, a sachet de sucre vanillé is split by eye, a
+feuille de gélatine is cut with scissors, a branche de thym is broken in two: all
+of those land on a half, as a gousse d'ail does. Half an oeuf would have to be
+beaten and weighed, which is not an amount a recipe asks for, so a count of oeufs,
+jaunes or blancs lands on a whole number.
 
 Approximate measures are quantities too. A pinch, a handful, a bouchon or a
 ramequin has the size the cook gives it, and the recipe's proportion lives in how
@@ -107,8 +114,10 @@ the line as published.
 Each ingredient also carries `adjusted`, which says whether rounding moved the
 number away from the exact product.
 
-Below a quarter there is nothing a kitchen can measure, so the amount is clamped
-up and **the line stops holding its share of the recipe**. Half a sachet of
+A shrinking line keeps the smallest share still worth measuring: a knife takes an
+oignon to a quarter, a boîte or a sachet goes to a half, an oeuf stops at one.
+Under that floor the amount is clamped up and **the line stops holding its share
+of the recipe**. Half a sachet of
 baking powder against three pots of flour comes out four times too strong that
 way, so the ingredient and the response both say it happened rather than leaving
 you to find out in the oven.
@@ -293,9 +302,16 @@ ailleurs que là où le calcul la mettait, un demi-œuf ramené à un œuf entie
 133,4 g écrits 135 g.
 
 Deux règles sont garanties. Réduire une recette **ne demande jamais davantage** que
-l'originale : un demi-sachet au facteur 0,667 devient un tiers de sachet, jamais un
+l'originale : un demi-sachet au facteur 0,667 reste un demi-sachet, jamais un
 sachet entier. Et l'adaptation ne **supprime jamais** un ingrédient en l'arrondissant
 à zéro, d'où les fractions pour les petites quantités.
+
+**Un dénombrable se divise selon son contenu, pas selon son emballage.** Une boîte
+de tomates se verse et le reste se garde, un sachet de sucre vanillé se partage à
+l'œil, une feuille de gélatine se coupe aux ciseaux, une branche de thym se casse
+en deux : tous tombent sur une demie, comme une gousse d'ail. Un demi-œuf, lui,
+demanderait de le battre et de le peser, ce qu'aucune recette ne demande : un
+nombre d'œufs, de jaunes ou de blancs tombe sur un entier.
 
 Les mesures approximatives sont des quantités elles aussi. Une pincée, une
 poignée, un bouchon ou un ramequin ont la taille que le cuisinier leur donne,
@@ -321,8 +337,10 @@ publiée.
 Chaque ingrédient porte aussi `adjusted`, qui dit si l'arrondi a déplacé le
 nombre par rapport au produit exact.
 
-Sous un quart, il n'y a plus rien qu'une cuisine puisse mesurer : la quantité est
-alors remontée et **la ligne cesse de tenir sa part de la recette**. Un demi-sachet
+Une ligne qui rétrécit garde la plus petite part qui vaille encore la peine : le
+couteau mène un oignon au quart, une boîte ou un sachet s'arrêtent à la demie, un
+œuf s'arrête à l'unité. Sous ce plancher, la quantité est remontée et **la ligne
+cesse de tenir sa part de la recette**. Un demi-sachet
 de levure face à trois pots de farine ressort ainsi quatre fois trop dosé, donc
 l'ingrédient et la réponse le disent, plutôt que de vous le laisser découvrir au
 four.

@@ -66,10 +66,14 @@ describe("countable items below one", () => {
     expect(scale("1 sachet de levure", 0.5).text).toContain("1/2");
   });
 
+  // This test used to expect a quarter of a sachet, on the reading that every
+  // counted thing shares one floor. The floor belongs to the thing: a sachet is
+  // split in two by eye and no finer, so a half is the smallest share of one
+  // that a kitchen can actually weigh out.
   it("says so when it clamped a quantity up to the smallest usable fraction", () => {
     const result = scale("1 sachet de levure", 0.02);
 
-    expect(result.amount).toBe(0.25);
+    expect(result.amount).toBe(0.5);
     expect(result.note, "a clamp that changes the ratio has to be stated").toMatch(/clamp/i);
   });
 
