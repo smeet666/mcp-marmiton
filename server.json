@@ -48,7 +48,7 @@
     },
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/smeet666/mcp-marmiton/releases/download/v1.4.0/mcp-marmiton-1.4.0.mcpb",
+      "identifier": "https://github.com/smeet666/mcp-marmiton/releases/download/v1.5.0/mcp-marmiton-1.5.0.mcpb",
       "version": "1.5.0",
       "transport": {
         "type": "stdio"
