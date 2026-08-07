@@ -7,6 +7,7 @@ import type { MarmitonClient } from "../marmiton/client.js";
 import { formatMinutes } from "../recipe/duration.js";
 import { isApproximateMeasure, passthroughIngredients, scaleIngredients } from "../recipe/scale.js";
 import type { ScaledIngredient } from "../recipe/scale.js";
+import { strictInput } from "./arguments.js";
 import { ok, scaledIngredientSchema, toToolError } from "./shared.js";
 import type { ToolResult } from "./shared.js";
 
@@ -21,7 +22,7 @@ export const getRecipeDescription = [
   "Always cite 'attribution' when showing a recipe to a user.",
 ].join(" ");
 
-export const getRecipeInputShape = {
+export const getRecipeInput = strictInput({
   id: z
     .string()
     .regex(/^\d+$/, "Recipe ids are digits only.")
@@ -42,7 +43,7 @@ export const getRecipeInputShape = {
     .describe(
       "Rescale the ingredients to this many servings. Omit to get the recipe exactly as published.",
     ),
-};
+});
 
 export const getRecipeOutputShape = {
   id: z.string(),

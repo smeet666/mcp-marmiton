@@ -5,6 +5,7 @@
 import { z } from "zod";
 import { invalidInput } from "../errors.js";
 import type { MarmitonClient } from "../marmiton/client.js";
+import { strictInput } from "./arguments.js";
 import { ok, toToolError } from "./shared.js";
 import type { ToolResult } from "./shared.js";
 
@@ -16,7 +17,7 @@ export const searchRecipesDescription = [
   "server does not, and there is no page parameter: narrow the query instead of asking for more pages.",
 ].join(" ");
 
-export const searchRecipesInputShape = {
+export const searchRecipesInput = strictInput({
   // Deliberately no min(1): an empty string would be rejected by the schema with
   // a protocol-level validation error, while a whitespace-only one would reach
   // the tool and come back as invalid_input. Letting both through to the same
@@ -32,7 +33,7 @@ export const searchRecipesInputShape = {
     .max(30)
     .default(10)
     .describe("Maximum recipes to return from this page of results."),
-};
+});
 
 export const searchRecipesOutputShape = {
   query: z.string(),

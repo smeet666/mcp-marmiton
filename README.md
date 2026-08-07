@@ -88,9 +88,28 @@ is why small amounts come back as fractions.
 **A counted thing is divided by what it holds, not by what holds it.** A boîte de
 tomates is poured and the rest kept, a sachet de sucre vanillé is split by eye, a
 feuille de gélatine is cut with scissors, a branche de thym is broken in two: all
-of those land on a half, as a gousse d'ail does. Half an oeuf would have to be
+of those land on a half. Half an oeuf would have to be
 beaten and weighed, which is not an amount a recipe asks for, so a count of oeufs,
-jaunes or blancs lands on a whole number.
+jaunes or blancs d'oeufs lands on a whole number. A few things are decided by what
+they are: a clou de girofle and a zeste are counted whole, a pot and a bouteille
+hold enough for a quarter to be a portion, a gousse and a tranche are cut off
+something larger and take a corner off in the same gesture, a blanc de poulet is
+meat and halves, and a douzaine states a number of things rather than a measure
+of them, so `2 douzaines d'escargots` at three quarters comes back as
+`18 escargots`.
+
+**A thing counted on its own is divided by the size of one against what a recipe
+puts in.** Une crevette, une moule, une noisette, un grain de poivre, une baie de
+genièvre, un anis étoilé is already a portion: a recipe counts twelve of them
+and a smaller recipe puts one fewer in the pan, so they land on a whole number.
+Un gigot, une baguette, un camembert, un ananas, un oignon, une pastèque, une
+pintade, un poulet, un poireau sits at
+the other end of that comparison, asked for by the one or the two and shared out
+with a knife, so they go as far as the quarter. A cut carved off one of them
+stops at the half, une cuisse and une aile being the portion the knife already
+produced. Un jus stops at the half: half
+the jus of a citron is taken by squeezing half the fruit, and a quarter of one
+has to be poured out and measured back.
 
 Approximate measures are quantities too. A pinch, a handful, a bouchon or a
 ramequin has the size the cook gives it, and the recipe's proportion lives in how
@@ -309,9 +328,16 @@ sachet entier. Et l'adaptation ne **supprime jamais** un ingrédient en l'arrond
 **Un dénombrable se divise selon son contenu, pas selon son emballage.** Une boîte
 de tomates se verse et le reste se garde, un sachet de sucre vanillé se partage à
 l'œil, une feuille de gélatine se coupe aux ciseaux, une branche de thym se casse
-en deux : tous tombent sur une demie, comme une gousse d'ail. Un demi-œuf, lui,
+en deux : tous tombent sur une demie. Un demi-œuf, lui,
 demanderait de le battre et de le peser, ce qu'aucune recette ne demande : un
-nombre d'œufs, de jaunes ou de blancs tombe sur un entier.
+nombre d'œufs, de jaunes ou de blancs d'œufs tombe sur un entier. Quelques cas se
+décident sur la nature de la chose : un clou de girofle et un zeste se comptent
+entiers, un pot et une bouteille en contiennent assez pour qu'un quart soit une
+portion, une gousse et une tranche sont déjà taillées dans plus grand et la
+planche leur reprend un coin du même geste, un blanc de poulet est une viande et
+se coupe en deux, et une douzaine
+énonce un nombre de choses plutôt qu'une mesure, si bien que
+« 2 douzaines d'escargots » réduites d'un quart reviennent en « 18 escargots ».
 
 Les mesures approximatives sont des quantités elles aussi. Une pincée, une
 poignée, un bouchon ou un ramequin ont la taille que le cuisinier leur donne,

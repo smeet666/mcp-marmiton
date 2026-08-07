@@ -12,7 +12,7 @@ import { createLogger, loadConfig } from "./config.js";
 import { MarmitonClient } from "./marmiton/client.js";
 import {
   getRecipeDescription,
-  getRecipeInputShape,
+  getRecipeInput,
   getRecipeOutputShape,
   runGetRecipe,
 } from "./tools/getRecipe.js";
@@ -20,14 +20,14 @@ import type { GetRecipeArgs } from "./tools/getRecipe.js";
 import {
   runScaleIngredients,
   scaleIngredientsDescription,
-  scaleIngredientsInputShape,
+  scaleIngredientsInput,
   scaleIngredientsOutputShape,
 } from "./tools/scaleIngredients.js";
 import type { ScaleIngredientsArgs } from "./tools/scaleIngredients.js";
 import {
   runSearchRecipes,
   searchRecipesDescription,
-  searchRecipesInputShape,
+  searchRecipesInput,
   searchRecipesOutputShape,
 } from "./tools/searchRecipes.js";
 import type { SearchRecipesArgs } from "./tools/searchRecipes.js";
@@ -82,7 +82,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
     {
       title: "Search recipes",
       description: searchRecipesDescription,
-      inputSchema: z.object(searchRecipesInputShape),
+      inputSchema: searchRecipesInput,
       outputSchema: z.object(searchRecipesOutputShape),
       annotations: READ_ONLY,
     },
@@ -94,7 +94,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
     {
       title: "Get a recipe",
       description: getRecipeDescription,
-      inputSchema: z.object(getRecipeInputShape),
+      inputSchema: getRecipeInput,
       outputSchema: z.object(getRecipeOutputShape),
       annotations: READ_ONLY,
     },
@@ -106,7 +106,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
     {
       title: "Scale an ingredient list",
       description: scaleIngredientsDescription,
-      inputSchema: z.object(scaleIngredientsInputShape),
+      inputSchema: scaleIngredientsInput,
       outputSchema: z.object(scaleIngredientsOutputShape),
       annotations: OFFLINE,
     },

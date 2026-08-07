@@ -2,23 +2,31 @@
 
 ## 1.6.0
 
-- A counted container is divided by what it holds rather than by what holds it. A
-  boîte, a pot, une brique, un sachet, une feuille de gélatine and une branche
-  were rounded to whole units: `1 boîte de tomates` taken to two fifths came back
-  as a third of a boîte, and three sachets halved came back as two. Half of each
-  of those can be poured, weighed or cut out and the rest kept, so they now land
-  on a half, as a gousse d'ail does: `1 boîte de tomates` at 0,4 reads
-  `1/2 boîte de tomates`, and `3 sachets` halved read `1 1/2 sachet`.
-- What stays whole is what half of cannot be measured out at all. An oeuf, a
-  jaune d'oeuf and a blanc d'oeuf are counted whole: `3 oeufs` reduced to a tenth
-  came back as `1/3 oeuf`, a third of an egg being something no recipe asks a
-  cook to produce, and now comes back as `1 oeuf` with the note saying the line
-  no longer holds its share. `3 oeufs` taken from six servings to twenty-five is
-  still 13 oeufs.
-- The floor a shrinking line is clamped up to follows the same rule instead of
-  being a quarter for everything: a quarter for produce a knife divides, such as
-  un oignon or une pomme, a half for a container or a gousse, one whole for an
-  oeuf. The clamp note names the floor the line landed on.
+- Refuse an argument the schema does not declare, rather than dropping it in
+  silence. The schema already announced that it accepted no others, and a caller
+  who misspells one was answered from the defaults as though the call had been
+  understood. The refusal names the argument, suggests the real one when it is
+  close, and lists what the tool takes.
+
+- Rewrite the rule that decides how far a counted thing can be divided. It read
+  the packaging, so a tin of tomatoes was never halved although half a tin of
+  apricots in syrup is poured out and the rest kept. What decides is the size of
+  one unit against what a recipe puts in: a crevette, a moule, a grain de poivre
+  is already a portion, counted by the dozen, and a smaller recipe puts one fewer
+  in the pan; a gigot, a camembert, an ananas is asked for by the one and shared
+  out with a knife. An oeuf, a jaune and a blanc d'oeuf stay whole, since halving
+  one means beating it and weighing the result. A jus stops at the half, which is
+  half a fruit squeezed rather than a quarter poured and measured back.
+
+- Read a douzaine as the twelve it stands for. Two douzaines d'escargots taken
+  down a quarter now asks for eighteen escargots.
+
+- Tell a blanc d'oeuf from a blanc de volaille, which the same word names and
+  which divide differently.
+
+- Agree a counted noun with the number that precedes it in more places. Words
+  ending in -as, -is, -us and -ous were taken for singulars, so two clous came
+  back as "1 clous", and an adjective following the noun stayed plural.
 
 ## 1.5.0
 

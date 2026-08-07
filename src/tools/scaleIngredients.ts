@@ -9,6 +9,7 @@
 import { z } from "zod";
 import { invalidInput } from "../errors.js";
 import { isApproximateMeasure, scaleIngredients } from "../recipe/scale.js";
+import { strictInput } from "./arguments.js";
 import { ok, scaledIngredientSchema, toToolError } from "./shared.js";
 import type { ToolResult } from "./shared.js";
 
@@ -25,7 +26,7 @@ export const scaleIngredientsDescription = [
   "carrying no quantity are returned untouched and flagged. Prefer this over doing the arithmetic yourself.",
 ].join(" ");
 
-export const scaleIngredientsInputShape = {
+export const scaleIngredientsInput = strictInput({
   ingredients: z
     .array(z.string().max(300))
     .min(1)
@@ -44,7 +45,7 @@ export const scaleIngredientsInputShape = {
     .optional()
     .describe("How many servings the list is written for."),
   to_servings: z.number().positive().max(500).optional().describe("How many servings are wanted."),
-};
+});
 
 export const scaleIngredientsOutputShape = {
   factor: z.number(),

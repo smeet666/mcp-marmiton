@@ -24,7 +24,8 @@ describe("a container is divided by what it holds", () => {
   it("halves every container whose content pours, weighs or cuts", () => {
     for (const line of [
       "1 sachet de sucre vanillé",
-      "1 pot de crème fraîche",
+      // A pot and a bouteille hold enough that a quarter of one is a portion,
+      // and they are checked against that floor in scale.divisibility.
       "1 brique de lait",
       "1 feuille de gélatine",
       "1 branche de thym",

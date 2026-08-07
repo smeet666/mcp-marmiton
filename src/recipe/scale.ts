@@ -10,8 +10,10 @@
  */
 
 import { formatAmount, parseIngredient } from "./quantity.js";
+import type { ParsedIngredient } from "./quantity.js";
 import type { Divisibility, UnitInfo } from "./units.js";
 import {
+  QUARTERED_MEASURE,
   demoteUnit,
   formatUnit,
   isSpoonMeasure,
@@ -89,28 +91,107 @@ function isHalfStep(value: number): boolean {
 }
 
 /**
- * Produce a knife divides as far as quarters, so a quarter of an oignon is an
- * amount. Anything else counted goes as far as the half.
+ * How finely a counted thing divides, decided by the size of one of them
+ * against what a recipe puts in.
  *
- * The list is read on an item stripped of its accents, so "échalote" and
+ * `PORTION_SIZED_ITEM` and `QUARTERED_ITEM` are the two ends of that one
+ * comparison, and each entry earns its place by where the food falls on it.
+ *
+ * Une crevette, une moule, une noisette, un grain de poivre, une baie de
+ * genièvre, une étoile d'anis is already a portion on its own. A recipe counts
+ * five, twelve, twenty of them, and a cook taking a share of that recipe puts
+ * one fewer in the pan; cutting one in two is not a thing a kitchen does. These
+ * land on a whole number.
+ *
+ * Un gigot, une baguette, un camembert, un ananas, un oignon, une pastèque, une
+ * pintade sits at the other end: a recipe asks for one or for two, and the
+ * share it wants out of one is decided by a knife. A quarter of one is a piece
+ * someone serves, and what is left keeps.
+ *
+ * The lists are read on an item stripped of its accents, so "échalote" and
  * "echalote" hit the same entry.
  */
+const PORTION_SIZED_ITEM =
+  /\b(crevettes?|gambas|langoustines?|moules?|noisettes?|grains?|genievres?|anis)\b/;
+
 const QUARTERED_ITEM =
-  /\b(oignons?|echalotes?|pommes? de terre|pommes?|poires?|carottes?|citrons?|oranges?|tomates?|concombres?|courgettes?|aubergines?|courges?|potirons?|choux?|melons?|poivrons?|betteraves?|navets?|panais)\b/;
+  /\b(oignons?|echalotes?|pommes? de terre|pommes?|poires?|carottes?|citrons?|oranges?|tomates?|concombres?|courgettes?|aubergines?|courges?|potirons?|choux?|melons?|poivrons?|betteraves?|navets?|panais|poireaux?|bananes?|mangues?|avocats?|pasteques?|gigots?|baguettes?|camemberts?|fromages?|chevres?|chorizos?|reblochons?|buches?|ananas|peches?|abricots?|laits?|poulets?|pintades?|rotis?)\b/;
+
+/**
+ * A piece carved off a bird or off a joint, which stops at the half.
+ *
+ * The whole animal divides by the knife that portions it, and one of these is
+ * already the portion that knife produced: a cuisse feeds one, and half of one
+ * is the share a smaller recipe serves. Taking a quarter would name a piece no
+ * one plates.
+ *
+ * It reads before the animal, whose name such a line carries alongside the cut.
+ */
+const HALVED_CUT = /\b(cuisses?|ailes?|pilons?|escalopes?|magrets?)\b/;
+
+/**
+ * A jus, the one counted thing whose division stops at the half.
+ *
+ * Half the jus of a citron is taken by squeezing half the fruit, which is a
+ * step a recipe writes. A quarter of one has to be poured out and measured
+ * back, and no recipe asks for that.
+ *
+ * It reads before the fruit, which a knife divides further on its own.
+ */
+const HALVED_ITEM = /\bjus\b/;
 
 /**
  * Things a kitchen takes one of or none of.
  *
- * An oeuf comes out of its shell whole, and so does the jaune or the blanc a
- * recipe asks for on its own: half of one would have to be beaten and weighed,
- * which is not an amount any recipe asks for and not one a cook can keep the
- * rest of. A count of them therefore lands on a whole number, whichever side of
- * the half the arithmetic fell on.
+ * An oeuf comes out of its shell whole, and so does the jaune a recipe asks for
+ * on its own: half of one would have to be beaten and weighed, which is not an
+ * amount any recipe asks for and not one a cook can keep the rest of. A count of
+ * them therefore lands on a whole number, whichever side of the half the
+ * arithmetic fell on.
  *
- * "blanc" alone names a chicken breast or the white of a leek as readily as the
- * white of an egg, so it counts here only when the line says which one it is.
+ * Two more belong here for reasons the criterion cannot reach on its own:
+ *
+ * - a clou de girofle is a dried flower bud, dropped into the pot and fished
+ *   back out of it. Nothing about it is measured, so there is no half of one to
+ *   take;
+ * - a zeste is what comes off one fruit in one go. A line asking for the zeste
+ *   of a citron is asking for all of it, and a share of a zeste names no amount
+ *   a cook stops at.
  */
-const WHOLE_ITEM = /\b(oeufs?|jaunes?|blancs? d ?(oeufs?))\b/;
+const WHOLE_ITEM = /\b(oeufs?|jaunes?|clous?|zestes?)\b/;
+
+/**
+ * How far a "blanc" divides, when a line names one.
+ *
+ * The word covers two foods that answer the question in opposite ways. The
+ * white of an oeuf goes with the oeuf and the jaune: half of one would have to
+ * be beaten and weighed. A blanc de poulet or de dinde is a piece of meat, and
+ * half of one is a portion a knife cuts and a fridge keeps.
+ *
+ * Deciding the word here rather than letting the line fall through is what
+ * keeps the fruit or the vegetable such a line often names beside the meat from
+ * answering for it.
+ *
+ * Null when the line names no blanc at all.
+ */
+function blancDivisibility(key: string): Divisibility | null {
+  // The noun is the one followed by what it is the blanc of. "vin blanc" and
+  // "oignon blanc" use the same letters as a colour and count as neither.
+  if (!/\bblancs? de? /.test(key)) return null;
+  return /\bblancs? de? oeufs?\b/.test(key) ? "whole" : "half";
+}
+
+/**
+ * The number the article itself stood for, which is one where a line wrote
+ * "une".
+ *
+ * `amount` carries the product once a word such as "douzaine" has multiplied it,
+ * and quoting that back as what the article was read as would credit the article
+ * with a figure it never gave.
+ */
+function articleValue(parsed: ParsedIngredient): number {
+  return parsed.amount === null ? 0 : parsed.amount / (parsed.countMultiplier ?? 1);
+}
 
 /** How finely the thing a line counts can be divided. */
 function divisibilityOf(unit: UnitInfo | null, item: string): Divisibility {
@@ -121,7 +202,13 @@ function divisibilityOf(unit: UnitInfo | null, item: string): Divisibility {
     .replace(/[̀-ͯ]/g, "")
     .replace(/œ/g, "oe")
     .replace(/['’]/g, " ");
+  const blanc = blancDivisibility(key);
+  if (blanc) return blanc;
   if (WHOLE_ITEM.test(key)) return "whole";
+  if (PORTION_SIZED_ITEM.test(key)) return "whole";
+  if (HALVED_ITEM.test(key)) return "half";
+  if (HALVED_CUT.test(key)) return "half";
+  if (QUARTERED_MEASURE.test(key)) return "quarter";
   return QUARTERED_ITEM.test(key) ? "quarter" : "half";
 }
 
@@ -285,6 +372,10 @@ export interface ScaleOptions {
  * only its trailing "s": nouns already ending in -s, -x or -z are invariable in
  * the plural ("ananas", "choux"), and forcing one would be worse than leaving the
  * word as the recipe wrote it.
+ *
+ * Going back down needs `INVARIABLE_NOUN`, because the ending settles nothing on
+ * its own: "jus" and "clous" both end in -us, and the first is a singular where
+ * the second is a plural of "clou".
  */
 function agreeWithAmount(item: string, amount: number): string {
   if (!item) return item;
@@ -298,17 +389,20 @@ function agreeWithAmount(item: string, amount: number): string {
 
   if (wantsPlural && !isPlural) {
     // Words ending in -s, -x or -z do not take a plural mark.
-    if (/[sxz]$/i.test(head)) return item;
+    if (/[sxz]$/i.test(head)) {
+      // The head stays as written.
+    }
     // "morceau" and "bocal" take -x and -aux where the ordinary noun takes -s.
-    if (/eau$/i.test(head)) words[0] = `${head}x`;
+    else if (/eau$/i.test(head)) words[0] = `${head}x`;
     else if (/al$/i.test(head)) words[0] = `${head.slice(0, -2)}aux`;
     else words[0] = `${head}s`;
   } else if (!wantsPlural && isPlural) {
     if (/eaux$/i.test(head)) words[0] = head.slice(0, -1);
     else if (/aux$/i.test(head)) words[0] = `${head.slice(0, -3)}al`;
     // "ananas", "anis", "couscous": the -s belongs to the singular.
-    else if (/[aiou]s$/i.test(head)) return item;
-    else words[0] = head.slice(0, -1);
+    else if (INVARIABLE_NOUN.has(foldWord(head))) {
+      // The head stays as written.
+    } else words[0] = head.slice(0, -1);
   }
 
   const last = words.length - 1;
@@ -319,6 +413,33 @@ function agreeWithAmount(item: string, amount: number): string {
 
   return words.join(" ");
 }
+
+/**
+ * Nouns carrying a final -s, -x or -z in the singular.
+ *
+ * The word is the same whatever the number, so the ending a plural would give
+ * back belongs to the singular and must stay.
+ */
+const INVARIABLE_NOUN = new Set([
+  "ananas",
+  "anis",
+  "brebis",
+  "cassis",
+  "colis",
+  "coulis",
+  "couscous",
+  "gambas",
+  "houmous",
+  "jus",
+  "mais",
+  "pastis",
+  "pois",
+  "radis",
+  "ris",
+  "souris",
+  "tamis",
+  "tapas",
+]);
 
 /**
  * Adjectives a recipe puts after the noun, and which take a plain -s.
@@ -332,6 +453,8 @@ function agreeWithAmount(item: string, amount: number): string {
 const AGREEABLE_ADJECTIVES = new Set([
   "entier",
   "entiere",
+  "etoile",
+  "etoilee",
   "moyen",
   "moyenne",
   "petit",
@@ -512,7 +635,7 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
     const many = unit ? formatUnit(unit, 2) : "measures";
     const sentences: string[] = [];
     if (parsed.articleWord) {
-      sentences.push(`"${parsed.articleWord}" read as ${formatAmount(parsed.amount)}.`);
+      sentences.push(`"${parsed.articleWord}" read as ${formatAmount(articleValue(parsed))}.`);
     }
     sentences.push(
       `${APPROXIMATE_MEASURE_MARKER} the number of ${many} was multiplied, and one ${one} ` +
@@ -536,7 +659,7 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
   // A line that wrote its amount as a word says which word it was, so a caller
   // can see the figure came from the grammar rather than from a digit.
   if (kind !== "vague" && parsed.articleWord) {
-    const read = `"${parsed.articleWord}" read as ${formatAmount(parsed.amount)}.`;
+    const read = `"${parsed.articleWord}" read as ${formatAmount(articleValue(parsed))}.`;
     result.note = result.note ? `${read} ${result.note}` : read;
   }
 

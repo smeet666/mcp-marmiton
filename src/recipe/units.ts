@@ -359,10 +359,33 @@ export type Divisibility =
  *
  * A gesture keeps its own answer: half a pincée is a fraction of a hand, and the
  * count is the whole of what a pincée can say.
+ *
+ * A short list of measures goes one step further, to the quarter. See
+ * `QUARTERED_MEASURE`.
  */
 export function unitDivisibility(unit: UnitInfo): Divisibility {
-  return unit.kind === "vague" ? "whole" : "half";
+  if (unit.kind === "vague") return "whole";
+  return QUARTERED_MEASURE.test(unit.canonical) ? "quarter" : "half";
 }
+
+/**
+ * Measures a cook takes a quarter of.
+ *
+ * The half is as far as the criterion goes on its own, because that is the
+ * share most measures give up by eye. These four answer the size question
+ * differently. A pot de crème fraîche and a bouteille hold enough that a
+ * quarter is still a portion someone serves and the rest still keeps: a quarter
+ * of a pot is a couple of spoonfuls, a quarter of a bouteille is a glass. A
+ * gousse and a tranche are already cut off something larger, and the board that
+ * produced one takes a corner off it in the same gesture: a quarter of a gousse
+ * d'ail is what a knife scrapes into a pan, a quarter of a tranche de pain is a
+ * crouton.
+ *
+ * The pattern is exported because a line can write the measure where the unit
+ * goes, in "1 pot de crème fraîche", or inside the name of what it counts, in
+ * "1 petit pot de crème". Both readings answer to the same list.
+ */
+export const QUARTERED_MEASURE = /\b(pots?|bouteilles?|gousses?|tranches?)\b/;
 
 /**
  * Spoons, glasses and bowls: a portion of a fixed size, which a kitchen measures

@@ -104,7 +104,7 @@ export function parseLeadingArticle(text: string): ParsedArticle | null {
   if (!match) return null;
 
   const rest = text.slice(match[0].length);
-  if (!matchLeadingUnit(rest, true)) return null;
+  if (!matchLeadingUnit(rest, true) && !readCountMultiplier(rest)) return null;
 
   const word = match[1]!;
   return {
@@ -112,6 +112,31 @@ export function parseLeadingArticle(text: string): ParsedArticle | null {
     length: match[0].length,
     word,
   };
+}
+
+/**
+ * Words that say how many things a number stands for, rather than how much of
+ * something one of them holds.
+ *
+ * A douzaine is twelve of whatever is being counted. "2 douzaines d'escargots"
+ * therefore asks for twenty-four escargots, and the answer divides the way an
+ * escargot does. Reading the word as a measure gives "1 1/2 douzaine", which is
+ * not a count a kitchen works with, and it hands the question of divisibility to
+ * a word that names no food.
+ */
+const COUNT_MULTIPLIERS: Record<string, number> = {
+  douzaine: 12,
+  douzaines: 12,
+};
+
+/** The multiplier a line opens with, and what stands after it. */
+function readCountMultiplier(text: string): { times: number; rest: string } | null {
+  const match = /^\s*(\p{L}+)\s+/u.exec(text);
+  if (!match) return null;
+
+  const times = COUNT_MULTIPLIERS[normalizeUnitKey(match[1]!)];
+  if (times === undefined) return null;
+  return { times, rest: text.slice(match[0].length) };
 }
 
 interface MatchedUnit {
@@ -186,6 +211,13 @@ export interface ParsedIngredient {
    * Null when the line wrote a number.
    */
   articleWord: string | null;
+  /**
+   * How many things one of the word the line counted with stands for, as in the
+   * twelve of "2 douzaines d'escargots". Null when the line counted the things
+   * themselves. `amount` already holds the product, so this is what says where
+   * the figure came from.
+   */
+  countMultiplier: number | null;
 }
 
 /**
@@ -211,10 +243,18 @@ export function parseIngredient(line: string): ParsedIngredient {
       unitText: null,
       item: text,
       articleWord: null,
+      countMultiplier: null,
     };
   }
 
   let rest = text.slice(quantity.length).trimStart();
+
+  // "2 douzaines d'escargots" counts escargots, twelve to the douzaine, so the
+  // multiplier is folded into the amount and the line goes on to be read as the
+  // count of a thing it now is.
+  const multiplier = readCountMultiplier(rest);
+  if (multiplier) rest = multiplier.rest;
+  const times = multiplier?.times ?? 1;
 
   const matched = matchLeadingUnit(rest, quantity === article);
   const unit = matched?.unit ?? null;
@@ -234,13 +274,14 @@ export function parseIngredient(line: string): ParsedIngredient {
 
   return {
     original,
-    amount: quantity.amount,
-    amountMax: range?.max ?? null,
+    amount: quantity.amount * times,
+    amountMax: range === null ? null : range.max * times,
     rangeSeparator: range?.separator ?? null,
     unit,
     unitText,
     item,
     articleWord: quantity === article ? (article?.word ?? null) : null,
+    countMultiplier: multiplier?.times ?? null,
   };
 }
 
