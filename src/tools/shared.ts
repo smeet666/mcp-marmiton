@@ -17,6 +17,13 @@ export const scaledIngredientSchema = z.object({
         "bigger unit, so 200 g scaled tenfold reads as 2 kg, and the bare number shrinks while the " +
         "quantity grows.",
     ),
+  amountMax: z
+    .number()
+    .nullable()
+    .describe(
+      "Upper bound when the line gives a range, as in '200 à 300 g', with 'amount' holding the lower " +
+        "one. Null when the line states a single amount.",
+    ),
   unit: z
     .string()
     .nullable()
@@ -25,9 +32,10 @@ export const scaledIngredientSchema = z.object({
     .enum(["scaled", "rounded", "unscaled"])
     .describe(
       "'scaled' means the arithmetic came out exact, which a count reaches as readily as a mass: one " +
-        "pinch multiplied by six is six pinches. 'rounded' means the value had to be moved to stay " +
-        "usable, to a whole or half unit or to a step a scale can show. 'unscaled' was left alone, " +
-        "because the line carries no quantity.",
+        "pincée multiplied by six is six pincées. 'rounded' means the value had to be moved to stay " +
+        "usable, to a whole or half unit or to a step a scale can show. 'unscaled' was left as " +
+        "published, because nothing on the line is the factor's to multiply: the note says which of " +
+        "the two it is.",
     ),
   adjusted: z
     .boolean()

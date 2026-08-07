@@ -36,10 +36,13 @@ describe("ranges", () => {
     expect(bounds.length).toBeGreaterThan(0);
   });
 
-  it("reports a range as its upper bound, so amount is never half the answer", () => {
+  it("reports the lower bound in `amount` and the upper one in `amountMax`", () => {
+    // Both ends are exposed, so a caller reading one figure knows which end of
+    // the range it is and can reach the other.
     const result = scale("2 à 3 gousses d'ail", 2);
 
-    expect(result.amount).toBe(6);
+    expect(result.amount).toBe(4);
+    expect(result.amountMax).toBe(6);
   });
 });
 

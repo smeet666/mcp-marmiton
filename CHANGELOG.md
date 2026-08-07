@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.7.0
+
+- Read the shapes a Marmiton line actually takes. A page that restates a weight
+  in brackets or after a slash, offers a choice with "ou", writes a mixed number
+  as "3 ¼", or marks a plural it does not know with "cuillère(s)" was answered
+  with a number that had lost part of itself: the second branch of a choice kept
+  the figure the page printed, the quarter of "3 ¼" travelled into the name of
+  the ingredient, and "8 cuillère(s)s" was not a word. Each of these is now read,
+  scaled and written back the way the line offered it.
+
+- Stop multiplying a figure that was never a count. An amount stated per person
+  already carries the change the factor asks for, and doubling it puts twice as
+  much on every plate; a number joined to a word by a hyphen gives the size of
+  one thing rather than how many; and a number grouped the way French never
+  groups one has two readings a thousand apart. All three come back as the page
+  published them, with a note saying which of the three it is, rather than with
+  the note about a line that carries no quantity, which was untrue of every one
+  of them.
+
+- Read the quantity behind the word that hid it. "environ 6 citrons" and
+  "~1 verre d'eau" carried an amount that was answered as if the line had none;
+  "1 grosse pincée de sel" lost the pincée, and with it the fact that a pincée is
+  held to no better than the hand. Both now read through to the figure and the
+  measure, and put the word and the sign back where the page had them.
+
+- Round a mass or a volume to the tenth between one and ten, where the step was
+  half a unit. A unit in that range can be a kilo as readily as a gram, and
+  halving 2,5 kg de figues gave 1,5 kg: two hundred grams more than the recipe
+  asked for, reported as though it were the product itself. A recipe made
+  smaller also never comes out asking for more than the page published, where
+  reducing a line by one percent could raise it by one.
+
+- Express a share of a cuillère à soupe or of a tasse in the smaller spoon. A
+  quarter of a cuillère à soupe exists on no measuring set, and the answer is
+  three quarters of a cuillère à café.
+
+- Put both ends of a range in one unit, chosen from the lower one, so
+  "450 à 1000 g" no longer comes back as "450 à 1 kg". Where both ends land on
+  the same amount the line states that amount once and says the range collapsed,
+  and `amount` now reports the lower bound with `amountMax` beside it, where it
+  reported the upper bound and offered no way to reach the other.
+
+- Say more about what happened to a line. A range whose two ends moved names each
+  of them with its own direction; a line carrying a second quantity after the
+  first says that only the first was scaled; a quantity below what a kitchen
+  scale resolves says so; and an approximate measure names what a kitchen usually
+  takes one to be, instead of a sentence that named none. A factor of one now
+  returns the line untouched, where it rewrote "178 ml" as "180 ml".
+
+- Take a gousse d'ail to the half and no finer, and count a baie de genévrier and
+  une étoile de badiane whole, as the person who cooks these recipes has them.
+
 ## 1.6.0
 
 - Refuse an argument the schema does not declare, rather than dropping it in

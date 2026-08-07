@@ -43,6 +43,12 @@ const UNITS: Record<string, UnitInfo> = {
   kilos: { canonical: "kg", kind: "measured", symbol: true },
   kilogramme: { canonical: "kg", kind: "measured", symbol: true },
   mg: { canonical: "mg", kind: "measured", symbol: true },
+  // A page glossing a metric weight names the pound, which French writes as a
+  // livre: "450 g (1 livre) de spaghetti".
+  livre: { canonical: "livre", kind: "measured", plural: "livres" },
+  livres: { canonical: "livre", kind: "measured", plural: "livres" },
+  lb: { canonical: "lb", kind: "measured", symbol: true },
+  lbs: { canonical: "lb", kind: "measured", symbol: true },
 
   // Volume
   ml: { canonical: "ml", kind: "measured", symbol: true },
@@ -144,13 +150,18 @@ const UNITS: Record<string, UnitInfo> = {
  * spoonful were an indivisible object.
  */
 export function normalizeUnitKey(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/\./g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/\./g, " ")
+      // A recipe that does not know how many it will be writes the plural mark in
+      // brackets: "4 cuillère(s) à soupe". The unit is the word without it.
+      .replace(/\((?:s|x|es)\)/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 /** Longest keys first, so "cuillere a soupe" wins over "cuillere". */
@@ -262,6 +273,13 @@ const PROMOTIONS: Record<string, UnitStep> = {
 };
 
 const DEMOTIONS: Record<string, UnitStep> = {
+  // Spoons and cups hold a fixed volume, so a share of one is stated in the
+  // smaller spoon rather than as a fraction no measuring set carries: a quarter
+  // of a cuillère à soupe is three quarters of a cuillère à café, and that is
+  // the one of the two a kitchen owns.
+  "cuillère à soupe": { to: "cuillere a cafe", per: 3 },
+  tasse: { to: "cuillere a soupe", per: 16 },
+
   kg: { to: "g", per: 1000 },
   l: { to: "cl", per: 100 },
   dl: { to: "cl", per: 10 },
@@ -281,64 +299,11 @@ export function demoteUnit(unit: UnitInfo): { unit: UnitInfo; per: number } | nu
   return target ? { unit: target, per: step.per } : null;
 }
 
-export interface ConvertedAmount {
-  amount: number;
-  unit: UnitInfo;
-}
-
-/**
- * Move an amount to the unit a cook would actually write it in.
- *
- * Promotion happens at a full unit of the next step up, so 999 g stays grams and
- * 1000 g becomes a kilo. Demotion happens below one, so half a litre reads
- * "50 cl" rather than "1/2 l". Only one step is taken in each direction, which
- * covers cooking quantities and keeps the result predictable.
- *
- * Rounding to two decimals after conversion keeps the error under a tenth of a
- * percent, well below what any kitchen scale resolves.
- */
-export function convertToReadableUnit(unit: UnitInfo, amount: number): ConvertedAmount {
-  const step = readableUnitStep(unit, amount);
-  if (step.ratio === 1) return { amount, unit };
-  return { amount: Math.round(amount * step.ratio * 100) / 100, unit: step.unit };
-}
-
-/**
- * The unit `convertToReadableUnit` would move an amount to, and what to
- * multiply by to get there.
- *
- * The ratio is what tells an exact product from a rounded one. Comparing a
- * result of 2 kg against a product of 2000 g says the value moved when nothing
- * did, and a line that multiplied cleanly would be reported as rounded.
- */
-export function readableUnitStep(
-  unit: UnitInfo,
-  amount: number,
-): { unit: UnitInfo; ratio: number } {
-  if (unit.kind !== "measured" || !Number.isFinite(amount) || amount <= 0) {
-    return { unit, ratio: 1 };
-  }
-
-  const up = PROMOTIONS[unit.canonical];
-  if (up && amount >= up.per) {
-    const target = lookupUnit(up.to);
-    if (target) return { unit: target, ratio: 1 / up.per };
-  }
-
-  const down = DEMOTIONS[unit.canonical];
-  if (down && amount < 1) {
-    const target = lookupUnit(down.to);
-    if (target) return { unit: target, ratio: down.per };
-  }
-
-  return { unit, ratio: 1 };
-}
-
 /** How finely a kitchen can divide one of a counted thing. */
 export type Divisibility =
   /** An oeuf: half of one is not an amount a kitchen measures out. */
   | "whole"
-  /** A boîte, a gousse, a feuille de gélatine: it splits in two, and no finer. */
+  /** A boîte, une gousse d'ail, a feuille de gélatine: it splits in two, and no finer. */
   | "half"
   /** An oignon, a pomme: a knife takes it to quarters. */
   | "quarter";
@@ -372,20 +337,19 @@ export function unitDivisibility(unit: UnitInfo): Divisibility {
  * Measures a cook takes a quarter of.
  *
  * The half is as far as the criterion goes on its own, because that is the
- * share most measures give up by eye. These four answer the size question
+ * share most measures give up by eye. These three answer the size question
  * differently. A pot de crème fraîche and a bouteille hold enough that a
  * quarter is still a portion someone serves and the rest still keeps: a quarter
  * of a pot is a couple of spoonfuls, a quarter of a bouteille is a glass. A
- * gousse and a tranche are already cut off something larger, and the board that
- * produced one takes a corner off it in the same gesture: a quarter of a gousse
- * d'ail is what a knife scrapes into a pan, a quarter of a tranche de pain is a
- * crouton.
+ * tranche is already cut off something larger, and the board that produced one
+ * takes a corner off it in the same gesture: a quarter of a tranche de pain is
+ * a crouton.
  *
  * The pattern is exported because a line can write the measure where the unit
  * goes, in "1 pot de crème fraîche", or inside the name of what it counts, in
  * "1 petit pot de crème". Both readings answer to the same list.
  */
-export const QUARTERED_MEASURE = /\b(pots?|bouteilles?|gousses?|tranches?)\b/;
+export const QUARTERED_MEASURE = /\b(pots?|bouteilles?|tranches?)\b/;
 
 /**
  * Spoons, glasses and bowls: a portion of a fixed size, which a kitchen measures
@@ -393,6 +357,98 @@ export const QUARTERED_MEASURE = /\b(pots?|bouteilles?|gousses?|tranches?)\b/;
  */
 export function isSpoonMeasure(unit: UnitInfo): boolean {
   return /^(cuillère à soupe|cuillère à café|verre|tasse|bol)$/.test(unit.canonical);
+}
+
+export interface ChosenUnit {
+  unit: UnitInfo;
+  /** What to multiply an amount in the original unit by to express it in this one. */
+  ratio: number;
+}
+
+/**
+ * Choose the unit a cook would actually write a quantity in, and say how to get
+ * there.
+ *
+ * A ratio rather than a converted number, because a range has two bounds and
+ * they have to end up in the same unit: converting each on its own gives the
+ * unreadable "450 g à 1 kg". The caller picks one bound to choose from, then
+ * applies the ratio to both.
+ *
+ * Demotion repeats while the amount is under one, so a quantity divided a
+ * thousandfold walks all the way down its ladder instead of rounding away.
+ * Promotion takes one step, at a full unit of the step above, so 999 g stays
+ * grams and 1000 g becomes a kilo.
+ */
+export function chooseReadableUnit(unit: UnitInfo, amount: number): ChosenUnit {
+  if (unit.kind !== "measured" || !Number.isFinite(amount) || amount <= 0) {
+    return { unit, ratio: 1 };
+  }
+
+  let current = unit;
+  let ratio = 1;
+
+  while (amount * ratio < 1) {
+    const step = demoteUnit(current);
+    if (!step) break;
+    ratio *= step.per;
+    current = step.unit;
+  }
+
+  const up = PROMOTIONS[current.canonical];
+  if (up && amount * ratio >= up.per) {
+    const target = lookupUnit(up.to);
+    if (target) {
+      ratio /= up.per;
+      current = target;
+    }
+  }
+
+  return { unit: current, ratio };
+}
+
+/**
+ * Matches a number followed by a unit anywhere in a piece of text.
+ *
+ * Used to spot a quantity this parser did not take, such as the second amount
+ * of "20 g de levure dissoute dans 1 cuillère à soupe d'eau", which would
+ * otherwise sit in a scaled line still saying what the original said.
+ */
+const EMBEDDED_MEASURE = new RegExp(
+  `\\d[\\d.,/]*\\s*(?:${UNIT_KEYS.map((key) => key.replace(/ /g, "\\s+")).join("|")})\\b`,
+  "i",
+);
+
+/**
+ * Whether a piece of text holds a number followed by a unit.
+ *
+ * The text is normalized first, because the vocabulary is keyed without accents
+ * and a line writes "cuillère à soupe" with them.
+ */
+export function hasEmbeddedMeasure(text: string): boolean {
+  return EMBEDDED_MEASURE.test(normalizeUnitKey(text));
+}
+
+/**
+ * What a kitchen usually takes each approximate measure to be.
+ *
+ * Offered as words for a note, never as the quantity: writing "2 cuillères à
+ * café" where the page wrote "4 pincées" puts a figure on the page it never
+ * claimed, and the cook is the one holding the pinch.
+ */
+const APPROXIMATE_EQUIVALENT: Record<string, string> = {
+  pincee: "commonly taken as about half a teaspoon",
+  poignee: "commonly taken as about a quarter of a cup",
+  bouchon: "commonly taken as about a tablespoon, the size of a bottle cap",
+  goutte: "commonly taken as a single drop",
+  filet: "commonly taken as about a teaspoon poured in a thin line",
+  noix: "commonly taken as about a tablespoon of butter",
+  louche: "commonly taken as about half a cup",
+  soupcon: "commonly taken as the smallest amount a spoon tip carries",
+};
+
+/** The everyday equivalence for an approximate measure, when there is a settled one. */
+export function approximateEquivalent(unit: UnitInfo): string | null {
+  return APPROXIMATE_EQUIVALENT[normalizeUnitKey(unit.canonical)] ?? null;
 }
 
 /**

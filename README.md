@@ -92,8 +92,9 @@ of those land on a half. Half an oeuf would have to be
 beaten and weighed, which is not an amount a recipe asks for, so a count of oeufs,
 jaunes or blancs d'oeufs lands on a whole number. A few things are decided by what
 they are: a clou de girofle and a zeste are counted whole, a pot and a bouteille
-hold enough for a quarter to be a portion, a gousse and a tranche are cut off
-something larger and take a corner off in the same gesture, a blanc de poulet is
+hold enough for a quarter to be a portion, a tranche is cut off
+something larger and the board takes a corner off it in the same gesture, a
+gousse d'ail is split in two and no finer, a blanc de poulet is
 meat and halves, and a douzaine states a number of things rather than a measure
 of them, so `2 douzaines d'escargots` at three quarters comes back as
 `18 escargots`.
@@ -120,7 +121,8 @@ converted into grams or spoons, where published equivalences span a fourfold
 range; an order of magnitude belongs in a note, never in the quantity.
 
 Ranges are read as one quantity: "2 à 3 gousses" doubled reads "4 à 6 gousses",
-and `amount` reports the upper bound, since that is what a cook buys.
+with `amount` holding the lower bound and `amountMax` the upper one. Where both
+ends land on the same amount, the line states that amount once and says so.
 
 A line that writes an article where a digit would go is read as one of the
 measure that follows it: `un bouchon de rhum` scaled sixfold is
@@ -333,8 +335,9 @@ demanderait de le battre et de le peser, ce qu'aucune recette ne demande : un
 nombre d'œufs, de jaunes ou de blancs d'œufs tombe sur un entier. Quelques cas se
 décident sur la nature de la chose : un clou de girofle et un zeste se comptent
 entiers, un pot et une bouteille en contiennent assez pour qu'un quart soit une
-portion, une gousse et une tranche sont déjà taillées dans plus grand et la
-planche leur reprend un coin du même geste, un blanc de poulet est une viande et
+portion, une tranche est déjà taillée dans plus grand et la planche lui reprend
+un coin du même geste, une gousse d'ail se coupe en deux et pas plus fin, un
+blanc de poulet est une viande et
 se coupe en deux, et une douzaine
 énonce un nombre de choses plutôt qu'une mesure, si bien que
 « 2 douzaines d'escargots » réduites d'un quart reviennent en « 18 escargots ».
@@ -349,8 +352,9 @@ note. Aucune conversion en grammes ni en cuillères : les
 sa place dans une note, jamais dans la quantité.
 
 Les fourchettes sont lues comme une seule quantité : « 2 à 3 gousses » doublé
-donne « 4 à 6 gousses », et `amount` renvoie la borne haute, celle que l'on
-achète.
+donne « 4 à 6 gousses », `amount` portant la borne basse et `amountMax` la borne
+haute. Quand les deux bornes tombent sur la même valeur, la ligne énonce cette
+valeur une fois et le signale.
 
 Une ligne qui écrit un article là où irait un chiffre est lue comme une unité de
 la mesure qui suit : « un bouchon de rhum » multiplié par six donne « 6 bouchons

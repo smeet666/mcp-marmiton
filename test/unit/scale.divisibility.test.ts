@@ -75,10 +75,12 @@ describe("a portion cut off a bird or a joint stops at the half", () => {
 });
 
 describe("a measure cut off something larger goes to the quarter", () => {
-  it("takes a quarter of a gousse", () => {
+  // The cook who uses these recipes settled how far a gousse goes: it is split
+  // in two and no finer.
+  it("takes a half of a gousse", () => {
     const result = scale("1 gousse d'ail", 0.25);
-    expect(result.amount).toBe(0.25);
-    expect(result.text).toBe("1/4 gousse d'ail");
+    expect(result.amount).toBe(0.5);
+    expect(result.text).toBe("1/2 gousse d'ail");
   });
 
   it("gives one gousse where four are reduced to a quarter", () => {

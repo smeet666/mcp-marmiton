@@ -65,13 +65,16 @@ describe("scaleIngredient — measured units scale continuously", () => {
     expect(r.amount).toBe(17);
   });
 
-  it("rounds to a half step between 1 and 10", () => {
-    // 3 x 0.667 = 2.001 -> 2 ; 3 x 1.2 = 3.6 -> 3.5, which is a tenth away
-    // from the product and therefore rounded.
+  it("rounds to a tenth between 1 and 10", () => {
+    // A unit in that range can be a kilo as readily as a gram, so a coarser
+    // step would move 3.6 kg of meat by a hundred grams.
     const r = scaleIngredient("3 g de sel fin", { factor: 1.2 });
-    expect(r.scaling).toBe("rounded");
-    expect((r.amount! * 2) % 1).toBe(0);
-    expect(r.amount).toBe(3.5);
+    expect(r.scaling).toBe("scaled");
+    expect(r.amount).toBe(3.6);
+
+    const coarser = scaleIngredient("3 g de sel fin", { factor: 1.21 });
+    expect(coarser.scaling).toBe("rounded");
+    expect(coarser.amount).toBe(3.6);
   });
 
   it("keeps the unit symbol invariable when scaling up", () => {

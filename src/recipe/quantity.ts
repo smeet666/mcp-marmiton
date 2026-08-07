@@ -27,17 +27,28 @@ const VULGAR_FRACTIONS: Record<string, number> = {
   "⅛": 0.125,
 };
 
+const VULGAR_CLASS = Object.keys(VULGAR_FRACTIONS).join("");
+
 /**
  * Read a leading amount.
  *
- * Handles, in order of precedence: a vulgar fraction glyph, a simple fraction
- * such as "1/2", a mixed number such as "1 1/2", and a decimal written with
- * either a dot or a French comma. Returns null when the line does not start with
- * a number, which is the normal case for "sel" or "coriandre".
+ * Handles, in order of precedence: a whole number followed by a fraction, in
+ * either the glyph form "3 ¼" or the written form "1 1/2"; a bare fraction; a
+ * bare glyph; and a decimal written with either a dot or a French comma.
+ * Returns null when the line does not start with a number, which is the normal
+ * case for "sel" or "coriandre".
  */
 export function parseLeadingQuantity(text: string): ParsedQuantity | null {
   const trimmed = text.trimStart();
   const offset = text.length - trimmed.length;
+
+  // "3 ¼" and "3¼" before the bare "3", so the longest reading wins.
+  const mixedGlyph = new RegExp(`^(\\d+)\\s*([${VULGAR_CLASS}])`).exec(trimmed);
+  if (mixedGlyph) {
+    const whole = Number(mixedGlyph[1]);
+    const fraction = VULGAR_FRACTIONS[mixedGlyph[2]!]!;
+    return { amount: whole + fraction, length: offset + mixedGlyph[0].length };
+  }
 
   const glyph = trimmed[0];
   if (glyph && glyph in VULGAR_FRACTIONS) {
@@ -63,6 +74,7 @@ export function parseLeadingQuantity(text: string): ParsedQuantity | null {
     }
   }
 
+  // French marks the decimal with a comma, so "1,5 kg" is a kilo and a half.
   const decimal = /^(\d+(?:[.,]\d+)?)/.exec(trimmed);
   if (decimal) {
     const amount = Number(decimal[1]!.replace(",", "."));
@@ -189,9 +201,51 @@ function matchLeadingUnit(text: string, partitive = false): MatchedUnit | null {
   return null;
 }
 
+/** One amount with its unit, as the line wrote it. */
+export interface Measure {
+  amount: number;
+  /** Upper bound when the measure is a range, null otherwise. */
+  amountMax: number | null;
+  /** The word or sign a range was written with. */
+  rangeSeparator: string | null;
+  unit: UnitInfo | null;
+}
+
+/**
+ * Why a line that shows a figure is still not the factor's to multiply.
+ *
+ * Each of these is a reading the parser can make and a scaling it must not do,
+ * and they are kept apart from a line with no figure at all so the answer can
+ * say which of the two it is looking at.
+ */
+export type HeldBack =
+  /** "2 tranches de 2-cm": the figure gives the size of one, not how many. */
+  | "sizeQualifier"
+  /** "2 pommes de terre par personne": the amount is already stated for one eater. */
+  | "perPerson"
+  /** "1,500,000 g" grouped the way French never groups a number. */
+  | "ambiguousDecimal";
+
 export interface ParsedIngredient {
   /** The line exactly as Marmiton stores it. */
   original: string;
+  /**
+   * Why the figure on this line must not be multiplied, when there is such a
+   * reason. Null for the ordinary line, whose amount is the factor's to scale.
+   */
+  heldBack: HeldBack | null;
+  /**
+   * The sign or word the page put before the amount to say it is loose, as in
+   * the "environ" of "environ 6 citrons". Null when the page stated the amount
+   * plainly.
+   */
+  approximation: string | null;
+  /**
+   * A size word standing between the number and the measure, as in the "grosse"
+   * of "1 grosse pincée". It goes back in front of the measure so the answer
+   * reads the way the page did.
+   */
+  measureAdjective: string | null;
   amount: number | null;
   /**
    * Upper bound when the line gives a range, as in "2 à 3 gousses". Null for a
@@ -204,6 +258,18 @@ export interface ParsedIngredient {
   unit: UnitInfo | null;
   /** Raw unit text as written, kept so the rewrite can stay faithful. */
   unitText: string | null;
+  /**
+   * The same quantity restated in another system, which pages give in brackets:
+   * "450 g (1 livre)". Left unscaled it would contradict the amount beside it,
+   * so it is parsed and scaled with the rest.
+   */
+  alternates: Measure[];
+  /**
+   * How the line introduced its equivalents: in brackets, as in "450 g (1
+   * livre)", or after a slash, as in "500 g / 1.1 lb". The rewrite puts them
+   * back the way the line offered them.
+   */
+  alternateStyle: "bracket" | "slash" | null;
   /** What the amount and unit apply to, for example "farine" or "oeufs". */
   item: string;
   /**
@@ -221,7 +287,77 @@ export interface ParsedIngredient {
 }
 
 /**
- * Split an ingredient line into amount, unit and item.
+ * A number grouped the way French never groups one.
+ *
+ * French marks the decimal with a comma and separates thousands with a space,
+ * so a second comma group is a number written by some other convention.
+ * Reading "1,500,000" as one and a half is wrong, and reading it as a million
+ * and a half is a guess about a page that gave no sign. Neither is safe, so the
+ * line goes back as published and says why.
+ */
+const AMBIGUOUS_COMMA = /^\s*\d+,\d+,\d/;
+
+/**
+ * A line that states its amount for one eater.
+ *
+ * The factor already says how many people the recipe is being made for, so
+ * multiplying an amount that is per person applies it twice and asks for twice
+ * as much on every plate.
+ */
+const PER_PERSON = /\bpar\s+(?:personne|convive|part|tête)\b/i;
+
+/**
+ * Signs and words a page puts before a number to say it is not exact.
+ *
+ * The number behind one of them is still a number, and reading none at all
+ * hands back the line with a note saying it carries no quantity, which is
+ * untrue. It is read, scaled and given back with the mark the page put on it,
+ * so the answer stays as loose as the page was.
+ */
+const APPROXIMATION_PREFIX = /^(?:~|≈|environ|approximativement|à peu près|a peu pres)\s*/i;
+
+/**
+ * Size words a recipe puts between the number and the measure.
+ *
+ * "1 grosse pincée" counts pincées and says how full one was. Reading the
+ * adjective as the thing being counted loses the measure, and with it the fact
+ * that a pincée is held to no better than the hand: the line comes back as an
+ * exact count of something the page never named.
+ */
+const MEASURE_ADJECTIVES = new Set([
+  "beau",
+  "belle",
+  "bon",
+  "bonne",
+  "grand",
+  "grande",
+  "gros",
+  "grosse",
+  "petit",
+  "petite",
+]);
+
+/** Lowercase and strip accents, so "générelle" and "generelle" hit one entry. */
+function fold(word: string): string {
+  return word.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+/** The adjective a line put in front of its measure, and what stands after it. */
+function takeMeasureAdjective(text: string): { adjective: string | null; rest: string } {
+  const match = /^\s*(\p{L}+)\s+/u.exec(text);
+  if (!match) return { adjective: null, rest: text };
+
+  const folded = fold(match[1]!);
+  // The word can be written in the plural where the count is, as in "2 grosses
+  // cuillères", and the list carries the singular.
+  const listed = MEASURE_ADJECTIVES.has(folded) || MEASURE_ADJECTIVES.has(folded.replace(/s$/, ""));
+  if (!listed) return { adjective: null, rest: text };
+
+  return { adjective: match[1]!, rest: text.slice(match[0].length) };
+}
+
+/**
+ * Split an ingredient line into amount, unit, bracketed equivalents and item.
  *
  * A missing amount is normal and not an error: many lines are just "sel". A
  * missing unit is equally normal and means the item is counted, as in "3 oeufs".
@@ -230,24 +366,38 @@ export function parseIngredient(line: string): ParsedIngredient {
   const original = line;
   const text = line.trim();
 
-  const range = parseLeadingRange(text);
-  const article = range ? null : parseLeadingArticle(text);
-  const quantity = range ?? parseLeadingQuantity(text) ?? article;
-  if (!quantity) {
-    return {
-      original,
-      amount: null,
-      amountMax: null,
-      rangeSeparator: null,
-      unit: null,
-      unitText: null,
-      item: text,
-      articleWord: null,
-      countMultiplier: null,
-    };
-  }
+  const empty = (heldBack: HeldBack | null): ParsedIngredient => ({
+    original,
+    heldBack,
+    approximation: null,
+    measureAdjective: null,
+    amount: null,
+    amountMax: null,
+    rangeSeparator: null,
+    unit: null,
+    unitText: null,
+    alternates: [],
+    alternateStyle: null,
+    item: text,
+    articleWord: null,
+    countMultiplier: null,
+  });
 
-  let rest = text.slice(quantity.length).trimStart();
+  if (AMBIGUOUS_COMMA.test(text)) return empty("ambiguousDecimal");
+
+  const loose = APPROXIMATION_PREFIX.exec(text);
+  const stated = loose ? text.slice(loose[0].length) : text;
+
+  const range = parseLeadingRange(stated);
+  const article = range ? null : parseLeadingArticle(stated);
+  const quantity = range ?? parseLeadingQuantity(stated) ?? article;
+  if (!quantity) return empty(null);
+
+  // A figure joined to a word by a hyphen describes one thing rather than
+  // counting things: "2 tranches de 2-cm" states a thickness.
+  if (/^-\p{L}/u.test(stated.slice(quantity.length))) return empty("sizeQualifier");
+
+  let rest = stated.slice(quantity.length).trimStart();
 
   // "2 douzaines d'escargots" counts escargots, twelve to the douzaine, so the
   // multiplier is folded into the amount and the line goes on to be read as the
@@ -256,33 +406,124 @@ export function parseIngredient(line: string): ParsedIngredient {
   if (multiplier) rest = multiplier.rest;
   const times = multiplier?.times ?? 1;
 
-  const matched = matchLeadingUnit(rest, quantity === article);
+  const fromArticle = quantity === article;
+  const direct = matchLeadingUnit(rest, fromArticle);
+  const described = direct ? { adjective: null, rest } : takeMeasureAdjective(rest);
+  // The adjective is only an adjective when a measure stands behind it. In
+  // "1 petit piment oiseau" the words that follow name the food itself, and
+  // taking one off would hand back a line the page never wrote.
+  const behind = described.adjective ? matchLeadingUnit(described.rest, fromArticle) : null;
+  const matched = direct ?? behind;
+  const adjective = behind ? described.adjective : null;
+
   const unit = matched?.unit ?? null;
   const unitText = matched?.unitText ?? null;
   if (matched) rest = matched.rest;
 
-  // "200 g de farine" reads better as item "farine" than "de farine".
-  //
-  // The article a partitive introduces goes with it: "2/3 d'un flacon" names a
-  // share of one flacon, and once the share has been multiplied the count sits
-  // where "un" stood. Leaving the article behind produces "4 un flacon", which
-  // reads as broken text rather than as a quantity.
-  const item = rest
-    .replace(/^(?:de\s+la\s+|de\s+l'|d'|de\s+|du\s+|des\s+)/i, "")
-    .replace(/^(?:une|un)\s+/i, "")
-    .trim();
+  const bracketed = takeAlternates(rest);
+  rest = bracketed.rest;
+
+  const slashed = bracketed.measures.length > 0 ? null : takeSlashAlternates(rest);
+  if (slashed) rest = slashed.rest;
 
   return {
     original,
+    heldBack: PER_PERSON.test(text) ? "perPerson" : null,
+    approximation: loose ? loose[0] : null,
+    measureAdjective: adjective,
     amount: quantity.amount * times,
     amountMax: range === null ? null : range.max * times,
     rangeSeparator: range?.separator ?? null,
     unit,
     unitText,
-    item,
-    articleWord: quantity === article ? (article?.word ?? null) : null,
+    alternates: slashed ? slashed.measures : bracketed.measures,
+    alternateStyle: slashed ? "slash" : bracketed.measures.length > 0 ? "bracket" : null,
+    // "200 g de farine" reads better as item "farine" than "de farine".
+    //
+    // The article a partitive introduces goes with it: "2/3 d'un flacon" names a
+    // share of one flacon, and once the share has been multiplied the count sits
+    // where "un" stood. Leaving the article behind produces "4 un flacon", which
+    // reads as broken text rather than as a quantity.
+    item: rest
+      .replace(/^(?:de\s+la\s+|de\s+l'|d'|de\s+|du\s+|des\s+)/i, "")
+      .replace(/^(?:une|un)\s+/i, "")
+      .trim(),
+    articleWord: fromArticle ? (article?.word ?? null) : null,
     countMultiplier: multiplier?.times ?? null,
   };
+}
+
+/**
+ * Read a bracketed group of equivalent measures, as in "(1 livre)" or
+ * "(500 g / 1.1 lb)".
+ *
+ * The group is only taken when every part of it reads as an amount with a unit.
+ * A bracket holding a remark, as in "(bien mûres)", stays in the item text
+ * where it belongs, because scaling it would mean scaling prose.
+ */
+function takeAlternates(text: string): { measures: Measure[]; rest: string } {
+  if (!text.startsWith("(")) return { measures: [], rest: text };
+  const close = text.indexOf(")");
+  if (close < 0) return { measures: [], rest: text };
+
+  const inside = text.slice(1, close);
+  const parts = inside.split("/").map((part) => part.trim());
+  const measures: Measure[] = [];
+
+  for (const part of parts) {
+    const range = parseLeadingRange(part);
+    const quantity = range ?? parseLeadingQuantity(part);
+    if (!quantity) return { measures: [], rest: text };
+
+    const after = matchLeadingUnit(part.slice(quantity.length).trimStart());
+    // A trailing word means the bracket is not purely a measure, as in
+    // "(2 cm d'épaisseur)", so the whole group is left as prose.
+    if (!after || after.rest.trim() !== "") return { measures: [], rest: text };
+
+    measures.push({
+      amount: quantity.amount,
+      amountMax: range?.max ?? null,
+      rangeSeparator: range?.separator ?? null,
+      unit: after.unit,
+    });
+  }
+
+  if (measures.length === 0) return { measures: [], rest: text };
+  return { measures, rest: text.slice(close + 1).trimStart() };
+}
+
+/**
+ * Read equivalents a line states after a slash, as in "500 g / 1.1 lb de
+ * flocons d'avoine", where the item follows the last of them.
+ *
+ * Both figures name one quantity, so both have to move together: a doubled
+ * line reading "1 kg / 1.1 lb" gives two answers a factor of two apart for the
+ * same ingredient. A slash followed by anything other than an amount and a
+ * unit is prose and stays in the item text.
+ */
+function takeSlashAlternates(text: string): { measures: Measure[]; rest: string } | null {
+  const measures: Measure[] = [];
+  let rest = text;
+
+  while (rest.startsWith("/")) {
+    const after = rest.slice(1).trimStart();
+    const range = parseLeadingRange(after);
+    const quantity = range ?? parseLeadingQuantity(after);
+    if (!quantity) break;
+
+    const taken = matchLeadingUnit(after.slice(quantity.length).trimStart());
+    if (!taken) break;
+
+    measures.push({
+      amount: quantity.amount,
+      amountMax: range?.max ?? null,
+      rangeSeparator: range?.separator ?? null,
+      unit: taken.unit,
+    });
+    rest = taken.rest.trimStart();
+  }
+
+  return measures.length > 0 ? { measures, rest } : null;
 }
 
 export interface ParsedRange extends ParsedQuantity {
@@ -341,13 +582,21 @@ export interface FormatAmountOptions {
  * Render an amount the way a recipe would write it.
  */
 export function formatAmount(amount: number, options: FormatAmountOptions = {}): string {
+  // French recipes write decimals with a comma. Two decimals is finer than any
+  // kitchen resolves, and for anything smaller than that it is zero: a quantity
+  // that survived being divided a thousandfold must not be handed back as none
+  // of the ingredient, so below that point the significant digits are written.
+  const decimal = (value: number) => {
+    const rounded =
+      value !== 0 && Math.abs(value) < 0.01
+        ? Number(value.toPrecision(2))
+        : Math.round(value * 100) / 100;
+    return String(rounded).replace(".", ",");
+  };
+
   if (!Number.isFinite(amount)) return "";
   if (Number.isInteger(amount)) return String(amount);
-
-  if (options.fractions === false) {
-    // French recipes write decimals with a comma.
-    return String(Math.round(amount * 100) / 100).replace(".", ",");
-  }
+  if (options.fractions === false) return decimal(amount);
 
   const whole = Math.floor(amount);
   const rest = amount - whole;
@@ -364,6 +613,5 @@ export function formatAmount(amount: number, options: FormatAmountOptions = {}):
     }
   }
 
-  // French recipes write decimals with a comma.
-  return String(Math.round(amount * 100) / 100).replace(".", ",");
+  return decimal(amount);
 }
