@@ -56,6 +56,32 @@ export interface SearchRecipesArgs {
   limit: number;
 }
 
+/**
+ * Whether a recipe title carries a word of the query.
+ *
+ * Marmiton matches on the opening letters, so "chameau" brings back a chapeau
+ * and three châteaux: the rows are what the site ranked, and none of them names
+ * the dish. Accents and punctuation are folded away so "crêpes" reads the same
+ * as "crepes", and words of two letters are ignored, since an article says
+ * nothing about the subject.
+ */
+function titleCarries(title: string, query: string): boolean {
+  const fold = (text: string) =>
+    text
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/œ/g, "oe")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ");
+
+  const haystack = ` ${fold(title)} `;
+  const words = fold(query)
+    .split(" ")
+    .filter((word) => word.length > 2);
+  if (words.length === 0) return true;
+  return words.some((word) => haystack.includes(` ${word}`));
+}
+
 export async function runSearchRecipes(
   client: MarmitonClient,
   args: SearchRecipesArgs,
@@ -91,6 +117,14 @@ export async function runSearchRecipes(
       url: recipe.url,
       image_url: recipe.imageUrl,
     }));
+
+    if (results.length > 0 && !results.some((recipe) => titleCarries(recipe.title, query))) {
+      notes.push(
+        `No title here carries a word of "${query}". Marmiton ranks a title on the letters it ` +
+          "opens with, so these rows are what the site offered for that spelling. Read them as " +
+          "candidates to check rather than as recipes for the dish.",
+      );
+    }
 
     const structured = {
       query,

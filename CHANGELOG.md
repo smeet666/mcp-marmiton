@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.8.0
+
+- A mass stated behind the thing counted is read as the size of one of them.
+  "1 dinde de 3 kg" names one bird and says what it weighs, and multiplying the
+  count answered a Christmas dinner for twelve with a bird and a half. Lines of
+  that shape come back as the page published them, with a note saying the figure
+  gives a size and that more people means a bigger bird. A container keeps
+  counting: "2 boîtes de 400 g de tomates" states what one boîte holds and goes
+  on to name what is in it, and an equivalence such as "450 g (1 livre) de
+  spaghetti" restates one quantity twice and is scaled on both sides.
+
+- A search whose wording matches nothing is an absence rather than a failure.
+  Marmiton serves a 404 on its results page when no recipe matches, and that was
+  handed back as a failed read, so a caller was told Marmiton could not be
+  reached for a search Marmiton had answered. Such a search now returns an empty
+  list with the note that says so, and a recipe page that is not there is still
+  reported as not_found.
+
+- A page of results carrying none of the words asked for says so. Marmiton ranks
+  a title on the letters it opens with, so "chameau farci" comes back with a
+  chapeau and three gâteaux château. When no title returned carries a word of
+  the query, the answer names that, and the rows read as candidates to check.
+
 ## 1.7.0
 
 - Read the shapes a Marmiton line actually takes. A page that restates a weight

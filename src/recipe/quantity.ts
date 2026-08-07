@@ -221,6 +221,8 @@ export interface Measure {
 export type HeldBack =
   /** "2 tranches de 2-cm": the figure gives the size of one, not how many. */
   | "sizeQualifier"
+  /** "1 dinde de 3 kg": the measure behind the item weighs one of them. */
+  | "itemSize"
   /** "2 pommes de terre par personne": the amount is already stated for one eater. */
   | "perPerson"
   /** "1,500,000 g" grouped the way French never groups a number. */
@@ -296,6 +298,48 @@ export interface ParsedIngredient {
  * line goes back as published and says why.
  */
 const AMBIGUOUS_COMMA = /^\s*\d+,\d+,\d/;
+
+/**
+ * Words that introduce what a container holds.
+ *
+ * "1 pot de 500 g de miel" counts pots and says how much honey is in one, so
+ * the count is the recipe's to multiply. The partitive standing after the
+ * measure is what marks the line as a container and its contents.
+ */
+const CONTAINER_CONTENTS = /^\s*(?:de\s|d'|du\s|des\s)/i;
+
+/**
+ * Whether the measure standing behind an item gives the size of one of them,
+ * as in "1 dinde de 3 kg".
+ *
+ * The count and the measure answer different questions: how many birds, and how
+ * heavy one bird is. A cook serving half again as many people takes a heavier
+ * bird, so the count belongs to the page rather than to the factor.
+ *
+ * Read on the item alone, which is what the line counts once its own measure
+ * has been taken off it, so "450 g (1 livre) de spaghetti" never reaches here:
+ * that line counts grams, and its bracket restates the same quantity.
+ */
+function statesItemSize(item: string): boolean {
+  const attached = /\s+de\s+(?=\d)/i.exec(item);
+  if (!attached) return false;
+
+  const named = item.slice(0, attached.index).trim();
+  if (!named || /\d/.test(named)) return false;
+
+  return isStatedSize(item.slice(attached.index + attached[0].length));
+}
+
+/** A mass or a volume standing on its own, with nothing it is the amount of. */
+function isStatedSize(text: string): boolean {
+  const size = parseLeadingQuantity(text);
+  if (!size) return false;
+
+  const measure = matchLeadingUnit(text.slice(size.length).trimStart());
+  if (!measure || measure.unit.kind !== "measured") return false;
+
+  return !CONTAINER_CONTENTS.test(measure.rest);
+}
 
 /**
  * A line that states its amount for one eater.
@@ -426,6 +470,29 @@ export function parseIngredient(line: string): ParsedIngredient {
   const slashed = bracketed.measures.length > 0 ? null : takeSlashAlternates(rest);
   if (slashed) rest = slashed.rest;
 
+  // "200 g de farine" reads better as item "farine" than "de farine".
+  //
+  // The article a partitive introduces goes with it: "2/3 d'un flacon" names a
+  // share of one flacon, and once the share has been multiplied the count sits
+  // where "un" stood. Leaving the article behind produces "4 un flacon", which
+  // reads as broken text rather than as a quantity.
+  const item = rest
+    .replace(/^(?:de\s+la\s+|de\s+l'|d'|de\s+|du\s+|des\s+)/i, "")
+    .replace(/^(?:une|un)\s+/i, "")
+    .trim();
+
+  // A counted thing whose size the line states: the number the line opens with
+  // is one bird, and the measure behind it is what that bird weighs.
+  if (!unit && statesItemSize(item)) return empty("itemSize");
+
+  // "une dinde de 3 kg" writes the noun where a measure stands, and the
+  // partitive takes it for one. A noun the vocabulary lists as a measure keeps
+  // counting, since a pot or a boîte is a thing to buy more of; a noun read as
+  // a measure only for standing there names the food itself, and a mass behind
+  // it is the size of one of them.
+  const readForItsPosition = unitText !== null && lookupUnit(normalizeUnitKey(unitText)) === null;
+  if (unit && readForItsPosition && isStatedSize(item)) return empty("itemSize");
+
   return {
     original,
     heldBack: PER_PERSON.test(text) ? "perPerson" : null,
@@ -438,16 +505,7 @@ export function parseIngredient(line: string): ParsedIngredient {
     unitText,
     alternates: slashed ? slashed.measures : bracketed.measures,
     alternateStyle: slashed ? "slash" : bracketed.measures.length > 0 ? "bracket" : null,
-    // "200 g de farine" reads better as item "farine" than "de farine".
-    //
-    // The article a partitive introduces goes with it: "2/3 d'un flacon" names a
-    // share of one flacon, and once the share has been multiplied the count sits
-    // where "un" stood. Leaving the article behind produces "4 un flacon", which
-    // reads as broken text rather than as a quantity.
-    item: rest
-      .replace(/^(?:de\s+la\s+|de\s+l'|d'|de\s+|du\s+|des\s+)/i, "")
-      .replace(/^(?:une|un)\s+/i, "")
-      .trim(),
+    item,
     articleWord: fromArticle ? (article?.word ?? null) : null,
     countMultiplier: multiplier?.times ?? null,
   };

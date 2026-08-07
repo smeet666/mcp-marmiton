@@ -12,6 +12,7 @@ import {
   createLogger,
   loadConfig,
 } from "../config.js";
+import { MarmitonError } from "../errors.js";
 import type { Recipe, RecipeSummary } from "../types.js";
 import { TtlLruCache } from "./cache.js";
 import { fetchHtml } from "./http.js";
@@ -77,7 +78,18 @@ export class MarmitonClient {
    */
   async search(query: string): Promise<Outcome<RecipeSummary[]>> {
     const url = buildSearchUrl(query);
-    return this.fetchParsed(url, (html) => parseSearchPage(html, url));
+    try {
+      return await this.fetchParsed(url, (html) => parseSearchPage(html, url));
+    } catch (error) {
+      // Marmiton answers a search matching no recipe with a 404 on the results
+      // page. That is the site stating an absence, and handing it back as a
+      // failed read would let a caller say Marmiton could not be reached when
+      // Marmiton answered.
+      if (error instanceof MarmitonError && error.code === "not_found") {
+        return { data: [], cached: false };
+      }
+      throw error;
+    }
   }
 
   async getRecipe(ref: { id?: string; url?: string }): Promise<Outcome<Recipe>> {

@@ -159,3 +159,13 @@ describe("what the criterion already settled stays settled", () => {
     expect(scale("1 oignon", 0.25).amount).toBe(0.25);
   });
 });
+
+describe("a feuille, whichever leaf it names", () => {
+  it("splits a feuille de laurier in two, as a pair of scissors does", () => {
+    expect(scale("1 feuille de laurier", 1.5).text).toBe("1 1/2 feuille de laurier");
+  });
+
+  it("splits a feuille de gélatine the same way", () => {
+    expect(scale("1 feuille de gélatine", 1.5).text).toBe("1 1/2 feuille de gélatine");
+  });
+});
