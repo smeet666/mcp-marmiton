@@ -286,7 +286,7 @@ function roundCountable(
     const candidates = steps.filter(
       (candidate) => candidate >= floor && candidate <= Math.max(ceiling, floor),
     );
-    let closest = candidates[0]!;
+    let closest = candidates[0] ?? floor;
     for (const candidate of candidates) {
       if (Math.abs(value - candidate) < Math.abs(value - closest)) closest = candidate;
     }
@@ -307,7 +307,7 @@ function roundSpoon(value: number, ceiling: number): CountableResult {
     const candidates = [SMALLEST_USABLE_FRACTION, 1 / 3, 0.5, 2 / 3, 0.75, 1].filter(
       (candidate) => candidate <= Math.max(ceiling, SMALLEST_USABLE_FRACTION),
     );
-    let closest = candidates[0]!;
+    let closest = candidates[0] ?? SMALLEST_USABLE_FRACTION;
     for (const candidate of candidates) {
       if (Math.abs(value - candidate) < Math.abs(value - closest)) closest = candidate;
     }
@@ -354,7 +354,12 @@ interface ScaledBound {
 }
 
 interface ScaledMeasure {
-  bounds: ScaledBound[];
+  /**
+   * One bound for a single measure, two for a range, in that order. The shape
+   * says so, because every reader takes the first without checking: a measure
+   * that scaled to nothing is not a thing this can produce.
+   */
+  bounds: [ScaledBound, ...ScaledBound[]];
   /** The unit every bound is expressed in, which both ends of a range share. */
   unit: UnitInfo | null;
 }
@@ -373,8 +378,25 @@ function scaleMeasure(
   factor: number,
   divisibility: Divisibility,
 ): ScaledMeasure {
-  const raws = high === null ? [low * factor] : [low * factor, high * factor];
-  const sources = high === null ? [low] : [low, high];
+  /** What the page published at one end of the measure, and what it scales to. */
+  interface End {
+    published: number;
+    raw: number;
+  }
+
+  const ends: [End, ...End[]] =
+    high === null
+      ? [{ published: low, raw: low * factor }]
+      : [
+          { published: low, raw: low * factor },
+          { published: high, raw: high * factor },
+        ];
+
+  /** Read both ends, keeping the shape every caller of the bounds relies on. */
+  const eachEnd = <T>(read: (end: End) => T): [T, ...T[]] => [
+    read(ends[0]),
+    ...ends.slice(1).map(read),
+  ];
   /**
    * The unit is chosen from the smaller end of a range.
    *
@@ -385,12 +407,12 @@ function scaleMeasure(
    * small end away entirely. A large number in a small unit is merely long to
    * read.
    */
-  const positive = raws.filter((raw) => raw > 0);
-  const reference = positive.length > 0 ? Math.min(...positive) : raws[0]!;
+  const positive = ends.map((end) => end.raw).filter((raw) => raw > 0);
+  const reference = positive.length > 0 ? Math.min(...positive) : low * factor;
 
   /** Both bounds share one unit, and each keeps the precision that unit affords. */
   const inUnit = (target: UnitInfo, ratio: number): ScaledMeasure => ({
-    bounds: raws.map((raw, index) => {
+    bounds: eachEnd(({ published, raw }) => {
       const exact = raw * ratio;
       // The rounding happens in the smaller of the two units, so moving to a
       // bigger one never throws away precision the page wrote: 1666 g rounded
@@ -403,7 +425,7 @@ function scaleMeasure(
       // Rounding to a step of five grams above a hundred can round upwards, and
       // a recipe being made smaller must never come out asking for more than
       // the page published.
-      const ceiling = factor < 1 ? sources[index]! * ratio : Number.POSITIVE_INFINITY;
+      const ceiling = factor < 1 ? published * ratio : Number.POSITIVE_INFINITY;
       return { amount: Math.min(usable, ceiling), exact, clamped: false, raw };
     }),
     unit: target,
@@ -420,17 +442,17 @@ function scaleMeasure(
     // precision of one rather than being snapped to the fractions of a spoon it
     // no longer fills.
     if (stepped.ratio !== 1) {
-      const bounds = raws.map((raw, index) => {
+      const bounds = eachEnd(({ published, raw }) => {
         const exact = raw * stepped.ratio;
-        const ceiling = factor < 1 ? sources[index]! * stepped.ratio : Number.POSITIVE_INFINITY;
+        const ceiling = factor < 1 ? published * stepped.ratio : Number.POSITIVE_INFINITY;
         const rounded = roundSpoon(exact, ceiling);
         return { amount: rounded.value, exact, clamped: rounded.clamped, raw };
       });
       return { bounds, unit: stepped.unit };
     }
 
-    const bounds = raws.map((raw, index) => {
-      const ceiling = factor < 1 ? sources[index]! : Number.POSITIVE_INFINITY;
+    const bounds = eachEnd(({ published, raw }) => {
+      const ceiling = factor < 1 ? published : Number.POSITIVE_INFINITY;
       const rounded = roundSpoon(raw, ceiling);
       return { amount: rounded.value, exact: raw, clamped: rounded.clamped, raw };
     });
@@ -443,17 +465,17 @@ function scaleMeasure(
     // therefore multiplies in whole units, and the measure stays in its own
     // vocabulary rather than being turned into grams or spoons, where published
     // equivalences span a fourfold range.
-    const bounds = raws.map((raw, index) => {
-      const ceiling = factor < 1 ? sources[index]! : Number.POSITIVE_INFINITY;
+    const bounds = eachEnd(({ published, raw }) => {
+      const ceiling = factor < 1 ? published : Number.POSITIVE_INFINITY;
       const rounded = roundCountable(raw, "whole", ceiling);
       return { amount: Math.min(rounded.value, ceiling), exact: raw, clamped: false, raw };
     });
     return { bounds, unit };
   }
 
-  const bounds = raws.map((raw, index) => {
+  const bounds = eachEnd(({ published, raw }) => {
     // Scaling down must never end up asking for more than the recipe did.
-    const ceiling = factor < 1 ? sources[index]! : Number.POSITIVE_INFINITY;
+    const ceiling = factor < 1 ? published : Number.POSITIVE_INFINITY;
     const rounded = roundCountable(raw, divisibility, ceiling);
     return { amount: rounded.value, exact: raw, clamped: rounded.clamped, raw };
   });
@@ -506,8 +528,9 @@ function agreeWithAmount(item: string, amount: number): string {
   }
 
   const last = words.length - 1;
-  if (last > 0) {
-    const adjective = agreeTrailingAdjective(words[last]!, wantsPlural);
+  const trailing = last > 0 ? words[last] : undefined;
+  if (trailing !== undefined) {
+    const adjective = agreeTrailingAdjective(trailing, wantsPlural);
     if (adjective) words[last] = adjective;
   }
 
@@ -803,7 +826,7 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
   // and multiplying both keeps that gap rather than closing it.
   const restated = parsed.alternateStyle === "slash";
 
-  const low = primaryBounds[0]!;
+  const low = primaryBounds[0];
   const high = primaryBounds[1] ?? null;
   const unit = primary.unit;
   const shown = high?.amount ?? low.amount;
@@ -999,7 +1022,7 @@ function renderMeasure(measure: Measure, factor: number): { text: string; bounds
     factor,
     divisibilityOf(measure.unit, ""),
   );
-  const low = scaled.bounds[0]!;
+  const low = scaled.bounds[0];
   const high = scaled.bounds[1] ?? null;
   const unit = scaled.unit;
   const shown = high?.amount ?? low.amount;

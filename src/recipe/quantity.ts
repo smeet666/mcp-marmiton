@@ -45,14 +45,17 @@ export function parseLeadingQuantity(text: string): ParsedQuantity | null {
   // "3 ¼" and "3¼" before the bare "3", so the longest reading wins.
   const mixedGlyph = new RegExp(`^(\\d+)\\s*([${VULGAR_CLASS}])`).exec(trimmed);
   if (mixedGlyph) {
-    const whole = Number(mixedGlyph[1]);
-    const fraction = VULGAR_FRACTIONS[mixedGlyph[2]!]!;
-    return { amount: whole + fraction, length: offset + mixedGlyph[0].length };
+    const [whole = "", glyph = ""] = mixedGlyph.slice(1);
+    const fraction = VULGAR_FRACTIONS[glyph];
+    if (fraction !== undefined) {
+      return { amount: Number(whole) + fraction, length: offset + mixedGlyph[0].length };
+    }
   }
 
-  const glyph = trimmed[0];
-  if (glyph && glyph in VULGAR_FRACTIONS) {
-    return { amount: VULGAR_FRACTIONS[glyph]!, length: offset + 1 };
+  const leading = trimmed[0];
+  const bare = leading === undefined ? undefined : VULGAR_FRACTIONS[leading];
+  if (bare !== undefined) {
+    return { amount: bare, length: offset + 1 };
   }
 
   // "1 1/2" before "1/2" before "1,5", so the longest reading wins.
@@ -77,7 +80,8 @@ export function parseLeadingQuantity(text: string): ParsedQuantity | null {
   // French marks the decimal with a comma, so "1,5 kg" is a kilo and a half.
   const decimal = /^(\d+(?:[.,]\d+)?)/.exec(trimmed);
   if (decimal) {
-    const amount = Number(decimal[1]!.replace(",", "."));
+    const [digits = ""] = decimal.slice(1);
+    const amount = Number(digits.replace(",", "."));
     if (Number.isFinite(amount)) {
       return { amount, length: offset + decimal[0].length };
     }
@@ -118,12 +122,11 @@ export function parseLeadingArticle(text: string): ParsedArticle | null {
   const rest = text.slice(match[0].length);
   if (!matchLeadingUnit(rest, true) && !readCountMultiplier(rest)) return null;
 
-  const word = match[1]!;
-  return {
-    amount: ARTICLE_AMOUNTS[word.toLowerCase()]!,
-    length: match[0].length,
-    word,
-  };
+  const [word = ""] = match.slice(1);
+  const amount = ARTICLE_AMOUNTS[word.toLowerCase()];
+  if (amount === undefined) return null;
+
+  return { amount, length: match[0].length, word };
 }
 
 /**
@@ -146,7 +149,8 @@ function readCountMultiplier(text: string): { times: number; rest: string } | nu
   const match = /^\s*(\p{L}+)\s+/u.exec(text);
   if (!match) return null;
 
-  const times = COUNT_MULTIPLIERS[normalizeUnitKey(match[1]!)];
+  const [word = ""] = match.slice(1);
+  const times = COUNT_MULTIPLIERS[normalizeUnitKey(word)];
   if (times === undefined) return null;
   return { times, rest: text.slice(match[0].length) };
 }
@@ -193,7 +197,7 @@ function matchLeadingUnit(text: string, partitive = false): MatchedUnit | null {
   if (measure) {
     return {
       unit: measure.unit,
-      unitText: text.trim().split(/\s+/)[0]!,
+      unitText: text.trim().split(/\s+/)[0] ?? "",
       rest: measure.rest,
     };
   }
@@ -336,7 +340,7 @@ function isStatedSize(text: string): boolean {
   if (!size) return false;
 
   const measure = matchLeadingUnit(text.slice(size.length).trimStart());
-  if (!measure || measure.unit.kind !== "measured") return false;
+  if (measure?.unit.kind !== "measured") return false;
 
   return !CONTAINER_CONTENTS.test(measure.rest);
 }
@@ -391,13 +395,14 @@ function takeMeasureAdjective(text: string): { adjective: string | null; rest: s
   const match = /^\s*(\p{L}+)\s+/u.exec(text);
   if (!match) return { adjective: null, rest: text };
 
-  const folded = fold(match[1]!);
+  const [adjective = ""] = match.slice(1);
+  const folded = fold(adjective);
   // The word can be written in the plural where the count is, as in "2 grosses
   // cuillères", and the list carries the singular.
   const listed = MEASURE_ADJECTIVES.has(folded) || MEASURE_ADJECTIVES.has(folded.replace(/s$/, ""));
   if (!listed) return { adjective: null, rest: text };
 
-  return { adjective: match[1]!, rest: text.slice(match[0].length) };
+  return { adjective, rest: text.slice(match[0].length) };
 }
 
 /**
@@ -536,7 +541,7 @@ function takeAlternates(text: string): { measures: Measure[]; rest: string } {
     const after = matchLeadingUnit(part.slice(quantity.length).trimStart());
     // A trailing word means the bracket is not purely a measure, as in
     // "(2 cm d'épaisseur)", so the whole group is left as prose.
-    if (!after || after.rest.trim() !== "") return { measures: [], rest: text };
+    if (after?.rest.trim() !== "") return { measures: [], rest: text };
 
     measures.push({
       amount: quantity.amount,
@@ -620,7 +625,7 @@ export function parseLeadingRange(text: string): ParsedRange | null {
   return {
     amount: low.amount,
     max: high.amount,
-    separator: separator[1]!,
+    separator: separator[1] ?? "",
     length: low.length + separator[0].length + high.length,
   };
 }
