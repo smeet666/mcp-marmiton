@@ -31,6 +31,73 @@ export interface HttpDeps {
 }
 
 /**
+ * What one answer from the site amounts to.
+ *
+ * Three outcomes and no fourth: the page is usable, the address holds nothing
+ * and never will, or the site is asking to be left alone for a while. Reading
+ * this apart from the loop keeps the loop about attempts and waits, which is
+ * the part where a mistake costs the site traffic it did not ask for.
+ */
+type Answer =
+  | { kind: "usable" }
+  | { kind: "refused"; error: MarmitonError }
+  | {
+      kind: "again";
+      error: MarmitonError;
+      waitMs: number | null;
+      penalise: boolean;
+      because: string;
+    };
+
+function readAnswer(
+  url: string,
+  status: number,
+  body: string,
+  retryAfterMs: number | null,
+  ownGuessMs: number,
+): Answer {
+  if (status === 429 || status === 503 || status === 403) {
+    return {
+      kind: "again",
+      error: rateLimited(url, retryAfterMs ?? ownGuessMs),
+      waitMs: retryAfterMs,
+      penalise: true,
+      because: "rate limited",
+    };
+  }
+  if (status === 404) {
+    return { kind: "refused", error: notFound(url, "that address") };
+  }
+  if (status >= 500) {
+    return {
+      kind: "again",
+      error: upstreamError(url, status),
+      waitMs: null,
+      penalise: false,
+      because: `status ${status}`,
+    };
+  }
+  if (status >= 400) {
+    return { kind: "refused", error: upstreamError(url, status) };
+  }
+
+  const trimmed = body.trim();
+  if (trimmed.length < MIN_PLAUSIBLE_HTML && !/<\/html>/i.test(trimmed)) {
+    // Too small to be a page: treat it as a refusal rather than parse it and
+    // report an empty result.
+    return {
+      kind: "again",
+      error: rateLimited(url, ownGuessMs),
+      waitMs: null,
+      penalise: true,
+      because: "implausibly short body",
+    };
+  }
+
+  return { kind: "usable" };
+}
+
+/**
  * Fetch one page as HTML, retrying transient conditions.
  *
  * The retry loop and its sleeps run inside a single limiter slot, so a queued
@@ -79,32 +146,18 @@ export async function fetchHtml(url: string, deps: HttpDeps): Promise<string> {
         continue;
       }
 
-      if (status === 429 || status === 503 || status === 403) {
-        limiter.penalize();
+      const verdict = readAnswer(url, status, body, retryAfterMs, backoffDelay(attempt));
+      if (verdict.kind === "refused") {
+        throw verdict.error;
+      }
+      if (verdict.kind === "again") {
+        if (verdict.penalise) {
+          limiter.penalize();
+          logger.info(`${verdict.because} on ${url}, interval now ${limiter.currentIntervalMs}ms`);
+        }
         // A server that says when to come back knows better than our own guess.
-        askedWaitMs = retryAfterMs;
-        lastError = rateLimited(url, retryAfterMs ?? backoffDelay(attempt));
-        logger.info(`rate limited on ${url}, interval now ${limiter.currentIntervalMs}ms`);
-        continue;
-      }
-      if (status === 404) {
-        throw notFound(url, "that address");
-      }
-      if (status >= 500) {
-        lastError = upstreamError(url, status);
-        continue;
-      }
-      if (status >= 400) {
-        throw upstreamError(url, status);
-      }
-
-      const trimmed = body.trim();
-      if (trimmed.length < MIN_PLAUSIBLE_HTML && !/<\/html>/i.test(trimmed)) {
-        // Too small to be a page: treat it as a refusal rather than parse it and
-        // report an empty result.
-        limiter.penalize();
-        lastError = rateLimited(url, backoffDelay(attempt));
-        logger.info(`implausibly short body on ${url}, treating as rate limiting`);
+        askedWaitMs = verdict.waitMs;
+        lastError = verdict.error;
         continue;
       }
 
