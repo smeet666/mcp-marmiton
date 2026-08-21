@@ -148,7 +148,7 @@ describe("approximate measures", () => {
   });
 
   it("scales every approximate measure by its count", () => {
-    const cases: Array<[string, string]> = [
+    const cases: [string, string][] = [
       ["1 pincée de sel", "3 pincées de sel"],
       ["1 poignée de roquette", "3 poignées de roquette"],
       ["1 trait de vinaigre", "3 traits de vinaigre"],

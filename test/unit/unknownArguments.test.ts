@@ -34,7 +34,7 @@ const TEST_CONFIG = {
 };
 
 /** One valid call per tool, so a refusal is never mistaken for a broken tool. */
-const CALLS: Array<[string, Record<string, unknown>]> = [
+const CALLS: [string, Record<string, unknown>][] = [
   ["search_recipes", { query: "tarte" }],
   ["get_recipe", { id: "11111" }],
   ["scale_ingredients", { ingredients: ["200 g de farine"], factor: 2 }],

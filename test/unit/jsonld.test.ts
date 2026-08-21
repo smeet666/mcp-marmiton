@@ -125,7 +125,7 @@ describe("asNumber", () => {
   });
 
   it("returns null on what is not a number", () => {
-    for (const v of [null, undefined, "abc", {}, [], NaN]) {
+    for (const v of [null, undefined, "abc", {}, [], Number.NaN]) {
       expect(asNumber(v), String(v)).toBeNull();
     }
   });

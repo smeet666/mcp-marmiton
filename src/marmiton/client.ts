@@ -94,7 +94,7 @@ export class MarmitonClient {
 
   async getRecipe(ref: { id?: string; url?: string }): Promise<Outcome<Recipe>> {
     const { id, url } = resolveRecipeRef(ref);
-    return this.fetchParsed(url, (html) => parseRecipePage(html, { id, url }));
+    return await this.fetchParsed(url, (html) => parseRecipePage(html, { id, url }));
   }
 
   /**

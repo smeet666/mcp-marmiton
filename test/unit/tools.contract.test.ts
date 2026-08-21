@@ -111,7 +111,7 @@ describe("search_recipes", () => {
     );
     expect(out["query"]).toBe("tarte");
     expect(out["result_count"]).toBe(5);
-    const results = out["results"] as Array<Record<string, unknown>>;
+    const results = out["results"] as Record<string, unknown>[];
     expect(results).toHaveLength(5);
     expect(results[0]!["id"]).toBe("11111");
     expect(results[0]!["title"]).toBe("Tarte placeholder aux fruits");
@@ -149,7 +149,7 @@ describe("search_recipes", () => {
     const { client, fetchImpl } = await connect({
       search: fixture("search-results.html"),
     });
-    const outcomes: Array<[string, boolean, string]> = [];
+    const outcomes: [string, boolean, string][] = [];
     for (const query of ["", "   ", "\n\t "]) {
       const res = await client.callTool({
         name: "search_recipes",
@@ -212,7 +212,7 @@ describe("get_recipe", () => {
     expect(y["requested"]).toBeNull();
     expect(y["factor"]).toBeNull();
 
-    const ingredients = out["ingredients"] as Array<Record<string, unknown>>;
+    const ingredients = out["ingredients"] as Record<string, unknown>[];
     expect(ingredients).toHaveLength(8);
     for (const ing of ingredients) {
       expect(ing["scaling"], String(ing["original"])).toBe("unscaled");
@@ -253,10 +253,7 @@ describe("get_recipe", () => {
     expect(y["factor"]).toBe(0.5);
 
     const byOriginal = new Map(
-      (out["ingredients"] as Array<Record<string, unknown>>).map((i) => [
-        i["original"] as string,
-        i,
-      ]),
+      (out["ingredients"] as Record<string, unknown>[]).map((i) => [i["original"] as string, i]),
     );
     expect(byOriginal.get("200 g de farine")!["text"]).toBe("100 g de farine");
     expect(byOriginal.get("200 g de farine")!["scaling"]).toBe("scaled");
@@ -296,7 +293,7 @@ describe("get_recipe", () => {
     expect(y["original_count"]).toBeNull();
     expect(y["factor"]).toBeNull();
 
-    for (const ing of out["ingredients"] as Array<Record<string, unknown>>) {
+    for (const ing of out["ingredients"] as Record<string, unknown>[]) {
       expect(ing["scaling"], String(ing["original"])).toBe("unscaled");
       expect(ing["text"], String(ing["original"])).toBe(ing["original"]);
     }
@@ -347,7 +344,7 @@ describe("scale_ingredients", () => {
         arguments: { ingredients: INGREDIENTS, factor: 2 },
       }),
     );
-    const results = out["ingredients"] as Array<Record<string, unknown>>;
+    const results = out["ingredients"] as Record<string, unknown>[];
     expect(results).toHaveLength(4);
     expect(results[0]!["text"]).toBe("400 g de farine");
     expect(results[1]!["text"]).toBe("6 oeufs");
@@ -369,7 +366,7 @@ describe("scale_ingredients", () => {
       }),
     );
     expect(out["factor"]).toBe(0.5);
-    const results = out["ingredients"] as Array<Record<string, unknown>>;
+    const results = out["ingredients"] as Record<string, unknown>[];
     expect(results[0]!["text"]).toBe("100 g de farine");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -392,7 +389,7 @@ describe("scale_ingredients", () => {
         },
       }),
     );
-    const results = out["ingredients"] as Array<Record<string, unknown>>;
+    const results = out["ingredients"] as Record<string, unknown>[];
     expect(results[1]!["text"]).toBe("4 pincées de bicarbonate de soude");
     expect(results[1]!["scaling"]).toBe("rounded");
     expect(results[1]!["note"]).toMatch(/approximate/i);

@@ -95,12 +95,17 @@ export async function runGetRecipe(
 ): Promise<ToolResult> {
   try {
     const ref: { id?: string; url?: string } = {};
-    if (args.id) ref.id = args.id;
-    else if (args.url) ref.url = args.url;
+    if (args.id) {
+      ref.id = args.id;
+    } else if (args.url) {
+      ref.url = args.url;
+    }
 
     const { data, cached } = await client.getRecipe(ref);
     const notes: string[] = [];
-    if (cached) notes.push("Served from this server's short-lived in-memory cache.");
+    if (cached) {
+      notes.push("Served from this server's short-lived in-memory cache.");
+    }
 
     const originalCount = data.recipeYield.count;
     let factor: number | null = null;

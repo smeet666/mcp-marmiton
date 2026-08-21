@@ -224,7 +224,7 @@ describe("scaleIngredient — approximate measures scale by their count", () => 
       [2, "2 pincées de sel", "scaled"],
       [4, "4 pincées de sel", "scaled"],
       [0.5, "1 pincée de sel", "rounded"],
-    ] as Array<[number, string, string]>) {
+    ] as [number, string, string][]) {
       const r = scaleIngredient(line, { factor });
       expect(r.scaling, `factor ${factor}`).toBe(scaling);
       expect(r.text, `factor ${factor}`).toBe(expected);
@@ -247,7 +247,7 @@ describe("scaleIngredient — approximate measures scale by their count", () => 
       ["1 filet d'huile d'olive", "3 filets d'huile d'olive"],
       ["2 gouttes d'extrait de vanille", "6 gouttes d'extrait de vanille"],
       ["1 poignée de roquette", "3 poignées de roquette"],
-    ] as Array<[string, string]>) {
+    ] as [string, string][]) {
       const r = scaleIngredient(line, { factor: 3 });
       expect(r.scaling, line).toBe("scaled");
       expect(r.text, line).toBe(expected);
@@ -260,10 +260,14 @@ describe("scaleIngredient — the two rules that matter", () => {
     const factors = [0.1, 0.2, 0.25, 1 / 3, 0.5, 0.6, 0.667, 0.75, 0.9];
     for (const line of FULL_RECIPE) {
       const before = parseIngredient(line).amount;
-      if (before === null) continue;
+      if (before === null) {
+        continue;
+      }
       for (const factor of factors) {
         const r = scaleIngredient(line, { factor });
-        if (r.scaling === "unscaled") continue;
+        if (r.scaling === "unscaled") {
+          continue;
+        }
         expect(r.amount, `${line} x ${factor}`).not.toBeNull();
         expect(r.amount!, `${line} x ${factor}`).toBeLessThanOrEqual(before);
       }
@@ -293,12 +297,16 @@ describe("scaleIngredient — the two rules that matter", () => {
 
     for (const line of FULL_RECIPE) {
       const parsed = parseIngredient(line);
-      if (parsed.amount === null) continue;
+      if (parsed.amount === null) {
+        continue;
+      }
       const before = base(parsed.amount, parsed.unit?.canonical ?? null);
 
       for (const factor of [1.1, 1.5, 2, 3, 10]) {
         const r = scaleIngredient(line, { factor });
-        if (r.scaling === "unscaled") continue;
+        if (r.scaling === "unscaled") {
+          continue;
+        }
         expect(base(r.amount!, r.unit), `${line} x ${factor}`).toBeGreaterThanOrEqual(before);
       }
     }
@@ -309,7 +317,9 @@ describe("scaleIngredient — the two rules that matter", () => {
     for (const line of FULL_RECIPE) {
       for (const factor of factors) {
         const r = scaleIngredient(line, { factor });
-        if (r.scaling === "unscaled") continue;
+        if (r.scaling === "unscaled") {
+          continue;
+        }
         expect(r.amount, `${line} x ${factor}`).not.toBe(0);
         expect(r.amount!, `${line} x ${factor}`).toBeGreaterThan(0);
         expect(r.text, `${line} x ${factor}`).not.toMatch(/(^|\s)0(\s|$)/);
@@ -322,7 +332,9 @@ describe("scaleIngredient — the two rules that matter", () => {
     for (const line of FULL_RECIPE) {
       for (const factor of factors) {
         const r = scaleIngredient(line, { factor });
-        if (r.scaling === "unscaled") continue;
+        if (r.scaling === "unscaled") {
+          continue;
+        }
         expect(r.text, `${line} x ${factor}`).toMatch(READABLE_AMOUNT_RE);
         expect(r.text, `${line} x ${factor}`).not.toContain(".");
       }
