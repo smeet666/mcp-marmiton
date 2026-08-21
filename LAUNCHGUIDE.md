@@ -1,9 +1,11 @@
 # mcp-marmiton
 
 ## Tagline
+
 French recipes from Marmiton, with quantities rescaled properly, and no API key.
 
 ## Description
+
 An MCP server for Marmiton, the largest French recipe site. Search recipes,
 read the ingredients and the steps, and ask for a different number of people.
 
@@ -17,6 +19,7 @@ Ratings, preparation and cooking times, yield and nutrition come back when
 Marmiton publishes them, and the answer says so when it does not.
 
 ## Setup Requirements
+
 - `MARMITON_USER_AGENT` (optional): Identify your own client. The project's own identifier is appended.
 - `MARMITON_MIN_INTERVAL_MS` (optional): Minimum gap between requests. Default 1000, and values below 500 are refused.
 - `MARMITON_TIMEOUT_MS` (optional): Per-request deadline. Default 15000.
@@ -26,9 +29,11 @@ Marmiton publishes them, and the answer says so when it does not.
 No API key and no account are needed.
 
 ## Category
+
 Content & Media
 
 ## Features
+
 - Search Marmiton recipes by free text
 - Read ingredients, steps, times, yield, category, author, rating and nutrition
 - Rescale a whole recipe to any number of servings in one call
@@ -40,6 +45,7 @@ Content & Media
 - Attribution and a source link on every result
 
 ## Getting Started
+
 - "Trouve-moi une recette de blanquette de veau et adapte-la pour 7 personnes"
 - "What goes into a proper tarte tatin, and how long does it bake?"
 - "I have this ingredient list for 4, rescale it to 6"
@@ -48,7 +54,9 @@ Content & Media
 - Tool: scale_ingredients — Rescales an ingredient list you already have, offline
 
 ## Tags
+
 recipes, cooking, food, french, marmiton, servings, scaling, meal-planning, no-api-key
 
 ## Documentation URL
+
 https://github.com/smeet666/mcp-marmiton#readme
