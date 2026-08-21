@@ -83,6 +83,51 @@ export const getRecipeOutputShape = {
   notes: z.array(z.string()),
 };
 
+/**
+ * What a rescaled list owes its reader beyond the quantities themselves.
+ *
+ * Each sentence answers a question a cook would otherwise have to ask of every
+ * line in turn: which figures moved, which ones stopped at a floor, which ones
+ * are the cook's own judgement, and which ones were left alone.
+ */
+function rescalingNotes(ingredients: readonly ScaledIngredient[], hasNutrition: boolean): string[] {
+  const notes: string[] = [];
+
+  // Lines that were actually moved, rather than lines that merely belong to the
+  // roundable category: doubling a recipe lands every egg whole.
+  const rounded = ingredients.filter(
+    (entry) => entry.scaling === "rounded" && entry.adjusted,
+  ).length;
+  if (rounded > 0) {
+    notes.push(`${rounded} quantity(ies) were rounded to remain usable; see the 'scaling' field.`);
+  }
+
+  const clamped = ingredients.filter((entry) => /clamped up/i.test(entry.note ?? "")).length;
+  if (clamped > 0) {
+    notes.push(
+      `${clamped} quantity(ies) fell below the smallest amount worth measuring and were ` +
+        "clamped up, so their proportions no longer match the published recipe.",
+    );
+  }
+
+  if (ingredients.some(isApproximateMeasure)) {
+    notes.push(
+      "Approximate measures such as a pinch or a handful had their count multiplied; the size " +
+        "of one is yours to judge.",
+    );
+  }
+
+  if (ingredients.some((entry) => entry.scaling === "unscaled")) {
+    notes.push("Some ingredients carry no usable quantity and were left as published.");
+  }
+
+  if (hasNutrition) {
+    notes.push("Nutrition values are for the recipe as published, not for the rescaled amounts.");
+  }
+
+  return notes;
+}
+
 export interface GetRecipeArgs {
   id?: string;
   url?: string;
@@ -131,39 +176,7 @@ export async function runGetRecipe(
           Math.round(factor * 100) / 100
         }).`,
       );
-      // Lines that were actually moved, rather than lines that merely belong to
-      // the roundable category: doubling a recipe lands every egg whole.
-      const roundedCount = ingredients.filter(
-        (entry) => entry.scaling === "rounded" && entry.adjusted,
-      ).length;
-      if (roundedCount > 0) {
-        notes.push(
-          `${roundedCount} quantity(ies) were rounded to remain usable; see the 'scaling' field.`,
-        );
-      }
-      const clampedCount = ingredients.filter((entry) =>
-        /clamped up/i.test(entry.note ?? ""),
-      ).length;
-      if (clampedCount > 0) {
-        notes.push(
-          `${clampedCount} quantity(ies) fell below the smallest amount worth measuring and were ` +
-            "clamped up, so their proportions no longer match the published recipe.",
-        );
-      }
-      if (ingredients.some(isApproximateMeasure)) {
-        notes.push(
-          "Approximate measures such as a pinch or a handful had their count multiplied; the size " +
-            "of one is yours to judge.",
-        );
-      }
-      if (ingredients.some((entry) => entry.scaling === "unscaled")) {
-        notes.push("Some ingredients carry no usable quantity and were left as published.");
-      }
-      if (data.nutrition) {
-        notes.push(
-          "Nutrition values are for the recipe as published, not for the rescaled amounts.",
-        );
-      }
+      notes.push(...rescalingNotes(ingredients, data.nutrition !== null));
     }
 
     const attribution = `${data.title} — recette Marmiton — ${data.url}`;

@@ -55,7 +55,9 @@
         "noEmptyTypeParameters": "error",
         "noExcessiveCognitiveComplexity": {
           "level": "error",
-          "options": { "maxAllowedComplexity": 40 }
+          "options": {
+            "maxAllowedComplexity": 25
+          }
         },
         "noExcessiveLinesPerFunction": {
           "level": "error",
