@@ -33,7 +33,9 @@ export function parseRecipePage(html: string, options: ParseRecipeOptions): Reci
   const ingredients = asStringList(node.recipeIngredient);
   const steps = asStringList(node.recipeInstructions);
 
-  if (!title) throw parseFailure(options.url, "the Recipe node has no name");
+  if (!title) {
+    throw parseFailure(options.url, "the Recipe node has no name");
+  }
   if (ingredients.length === 0) {
     throw parseFailure(options.url, "the Recipe node carries no ingredient list");
   }
@@ -57,10 +59,14 @@ export function parseRecipePage(html: string, options: ParseRecipeOptions): Reci
 }
 
 function parseRating(value: unknown): Rating | null {
-  if (typeof value !== "object" || value === null) return null;
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
   const record = value as Record<string, unknown>;
   const ratingValue = asNumber(record.ratingValue);
-  if (ratingValue === null) return null;
+  if (ratingValue === null) {
+    return null;
+  }
   return {
     value: ratingValue,
     count: asNumber(record.ratingCount) ?? asNumber(record.reviewCount),
@@ -69,7 +75,9 @@ function parseRating(value: unknown): Rating | null {
 }
 
 function parseNutrition(value: unknown): Nutrition | null {
-  if (typeof value !== "object" || value === null) return null;
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
   const record = value as Record<string, unknown>;
   const nutrition: Nutrition = {
     calories: asString(record.calories),

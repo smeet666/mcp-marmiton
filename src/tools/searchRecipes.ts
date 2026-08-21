@@ -78,7 +78,9 @@ function titleCarries(title: string, query: string): boolean {
   const words = fold(query)
     .split(" ")
     .filter((word) => word.length > 2);
-  if (words.length === 0) return true;
+  if (words.length === 0) {
+    return true;
+  }
   return words.some((word) => haystack.includes(` ${word}`));
 }
 
@@ -100,7 +102,9 @@ export async function runSearchRecipes(
 
     const { data, cached } = await client.search(query);
     const notes: string[] = [];
-    if (cached) notes.push("Served from this server's short-lived in-memory cache.");
+    if (cached) {
+      notes.push("Served from this server's short-lived in-memory cache.");
+    }
     if (data.length > args.limit) {
       notes.push(`This page holds ${data.length} recipes; showing the first ${args.limit}.`);
     }

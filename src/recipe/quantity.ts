@@ -117,14 +117,20 @@ export interface ParsedArticle extends ParsedQuantity {
  */
 export function parseLeadingArticle(text: string): ParsedArticle | null {
   const match = /^\s*(un|une|quelques)\b\s*/i.exec(text);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
 
   const rest = text.slice(match[0].length);
-  if (!matchLeadingUnit(rest, true) && !readCountMultiplier(rest)) return null;
+  if (!matchLeadingUnit(rest, true) && !readCountMultiplier(rest)) {
+    return null;
+  }
 
   const [word = ""] = match.slice(1);
   const amount = ARTICLE_AMOUNTS[word.toLowerCase()];
-  if (amount === undefined) return null;
+  if (amount === undefined) {
+    return null;
+  }
 
   return { amount, length: match[0].length, word };
 }
@@ -147,11 +153,15 @@ const COUNT_MULTIPLIERS: Record<string, number> = {
 /** The multiplier a line opens with, and what stands after it. */
 function readCountMultiplier(text: string): { times: number; rest: string } | null {
   const match = /^\s*(\p{L}+)\s+/u.exec(text);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
 
   const [word = ""] = match.slice(1);
   const times = COUNT_MULTIPLIERS[normalizeUnitKey(word)];
-  if (times === undefined) return null;
+  if (times === undefined) {
+    return null;
+  }
   return { times, rest: text.slice(match[0].length) };
 }
 
@@ -179,9 +189,13 @@ interface MatchedUnit {
 function matchLeadingUnit(text: string, partitive = false): MatchedUnit | null {
   const normalized = normalizeUnitKey(text);
   for (const key of UNIT_KEYS) {
-    if (normalized !== key && !normalized.startsWith(`${key} `)) continue;
+    if (normalized !== key && !normalized.startsWith(`${key} `)) {
+      continue;
+    }
     const unit = lookupUnit(key);
-    if (!unit) continue;
+    if (!unit) {
+      continue;
+    }
     // Consume the same number of words from the original text, which may be
     // spelled with accents the normalized key has lost.
     const wordCount = key.split(" ").length;
@@ -326,10 +340,14 @@ const CONTAINER_CONTENTS = /^\s*(?:de\s|d'|du\s|des\s)/i;
  */
 function statesItemSize(item: string): boolean {
   const attached = /\s+de\s+(?=\d)/i.exec(item);
-  if (!attached) return false;
+  if (!attached) {
+    return false;
+  }
 
   const named = item.slice(0, attached.index).trim();
-  if (!named || /\d/.test(named)) return false;
+  if (!named || /\d/.test(named)) {
+    return false;
+  }
 
   return isStatedSize(item.slice(attached.index + attached[0].length));
 }
@@ -337,10 +355,14 @@ function statesItemSize(item: string): boolean {
 /** A mass or a volume standing on its own, with nothing it is the amount of. */
 function isStatedSize(text: string): boolean {
   const size = parseLeadingQuantity(text);
-  if (!size) return false;
+  if (!size) {
+    return false;
+  }
 
   const measure = matchLeadingUnit(text.slice(size.length).trimStart());
-  if (measure?.unit.kind !== "measured") return false;
+  if (measure?.unit.kind !== "measured") {
+    return false;
+  }
 
   return !CONTAINER_CONTENTS.test(measure.rest);
 }
@@ -393,16 +415,37 @@ function fold(word: string): string {
 /** The adjective a line put in front of its measure, and what stands after it. */
 function takeMeasureAdjective(text: string): { adjective: string | null; rest: string } {
   const match = /^\s*(\p{L}+)\s+/u.exec(text);
-  if (!match) return { adjective: null, rest: text };
+  if (!match) {
+    return { adjective: null, rest: text };
+  }
 
   const [adjective = ""] = match.slice(1);
   const folded = fold(adjective);
   // The word can be written in the plural where the count is, as in "2 grosses
   // cuillères", and the list carries the singular.
   const listed = MEASURE_ADJECTIVES.has(folded) || MEASURE_ADJECTIVES.has(folded.replace(/s$/, ""));
-  if (!listed) return { adjective: null, rest: text };
+  if (!listed) {
+    return { adjective: null, rest: text };
+  }
 
   return { adjective, rest: text.slice(match[0].length) };
+}
+
+/**
+ * How a line writes the equivalents beside its measure, when it writes any.
+ *
+ * "125 g / 1 tasse" states them with a slash and reads as one line; "125 g
+ * (1 tasse)" puts them in brackets. The reading is kept rather than the
+ * rendering being guessed back from the measures later.
+ */
+function alternateStyleOf(slashed: boolean, bracketed: boolean): "slash" | "bracket" | null {
+  if (slashed) {
+    return "slash";
+  }
+  if (bracketed) {
+    return "bracket";
+  }
+  return null;
 }
 
 /**
@@ -432,7 +475,9 @@ export function parseIngredient(line: string): ParsedIngredient {
     countMultiplier: null,
   });
 
-  if (AMBIGUOUS_COMMA.test(text)) return empty("ambiguousDecimal");
+  if (AMBIGUOUS_COMMA.test(text)) {
+    return empty("ambiguousDecimal");
+  }
 
   const loose = APPROXIMATION_PREFIX.exec(text);
   const stated = loose ? text.slice(loose[0].length) : text;
@@ -440,11 +485,15 @@ export function parseIngredient(line: string): ParsedIngredient {
   const range = parseLeadingRange(stated);
   const article = range ? null : parseLeadingArticle(stated);
   const quantity = range ?? parseLeadingQuantity(stated) ?? article;
-  if (!quantity) return empty(null);
+  if (!quantity) {
+    return empty(null);
+  }
 
   // A figure joined to a word by a hyphen describes one thing rather than
   // counting things: "2 tranches de 2-cm" states a thickness.
-  if (/^-\p{L}/u.test(stated.slice(quantity.length))) return empty("sizeQualifier");
+  if (/^-\p{L}/u.test(stated.slice(quantity.length))) {
+    return empty("sizeQualifier");
+  }
 
   let rest = stated.slice(quantity.length).trimStart();
 
@@ -452,7 +501,9 @@ export function parseIngredient(line: string): ParsedIngredient {
   // multiplier is folded into the amount and the line goes on to be read as the
   // count of a thing it now is.
   const multiplier = readCountMultiplier(rest);
-  if (multiplier) rest = multiplier.rest;
+  if (multiplier) {
+    rest = multiplier.rest;
+  }
   const times = multiplier?.times ?? 1;
 
   const fromArticle = quantity === article;
@@ -467,13 +518,17 @@ export function parseIngredient(line: string): ParsedIngredient {
 
   const unit = matched?.unit ?? null;
   const unitText = matched?.unitText ?? null;
-  if (matched) rest = matched.rest;
+  if (matched) {
+    rest = matched.rest;
+  }
 
   const bracketed = takeAlternates(rest);
   rest = bracketed.rest;
 
   const slashed = bracketed.measures.length > 0 ? null : takeSlashAlternates(rest);
-  if (slashed) rest = slashed.rest;
+  if (slashed) {
+    rest = slashed.rest;
+  }
 
   // "200 g de farine" reads better as item "farine" than "de farine".
   //
@@ -488,7 +543,9 @@ export function parseIngredient(line: string): ParsedIngredient {
 
   // A counted thing whose size the line states: the number the line opens with
   // is one bird, and the measure behind it is what that bird weighs.
-  if (!unit && statesItemSize(item)) return empty("itemSize");
+  if (!unit && statesItemSize(item)) {
+    return empty("itemSize");
+  }
 
   // "une dinde de 3 kg" writes the noun where a measure stands, and the
   // partitive takes it for one. A noun the vocabulary lists as a measure keeps
@@ -496,7 +553,9 @@ export function parseIngredient(line: string): ParsedIngredient {
   // a measure only for standing there names the food itself, and a mass behind
   // it is the size of one of them.
   const readForItsPosition = unitText !== null && lookupUnit(normalizeUnitKey(unitText)) === null;
-  if (unit && readForItsPosition && isStatedSize(item)) return empty("itemSize");
+  if (unit && readForItsPosition && isStatedSize(item)) {
+    return empty("itemSize");
+  }
 
   return {
     original,
@@ -509,7 +568,7 @@ export function parseIngredient(line: string): ParsedIngredient {
     unit,
     unitText,
     alternates: slashed ? slashed.measures : bracketed.measures,
-    alternateStyle: slashed ? "slash" : bracketed.measures.length > 0 ? "bracket" : null,
+    alternateStyle: alternateStyleOf(slashed !== null, bracketed.measures.length > 0),
     item,
     articleWord: fromArticle ? (article?.word ?? null) : null,
     countMultiplier: multiplier?.times ?? null,
@@ -525,9 +584,13 @@ export function parseIngredient(line: string): ParsedIngredient {
  * where it belongs, because scaling it would mean scaling prose.
  */
 function takeAlternates(text: string): { measures: Measure[]; rest: string } {
-  if (!text.startsWith("(")) return { measures: [], rest: text };
+  if (!text.startsWith("(")) {
+    return { measures: [], rest: text };
+  }
   const close = text.indexOf(")");
-  if (close < 0) return { measures: [], rest: text };
+  if (close < 0) {
+    return { measures: [], rest: text };
+  }
 
   const inside = text.slice(1, close);
   const parts = inside.split("/").map((part) => part.trim());
@@ -536,12 +599,16 @@ function takeAlternates(text: string): { measures: Measure[]; rest: string } {
   for (const part of parts) {
     const range = parseLeadingRange(part);
     const quantity = range ?? parseLeadingQuantity(part);
-    if (!quantity) return { measures: [], rest: text };
+    if (!quantity) {
+      return { measures: [], rest: text };
+    }
 
     const after = matchLeadingUnit(part.slice(quantity.length).trimStart());
     // A trailing word means the bracket is not purely a measure, as in
     // "(2 cm d'épaisseur)", so the whole group is left as prose.
-    if (after?.rest.trim() !== "") return { measures: [], rest: text };
+    if (after?.rest.trim() !== "") {
+      return { measures: [], rest: text };
+    }
 
     measures.push({
       amount: quantity.amount,
@@ -551,7 +618,9 @@ function takeAlternates(text: string): { measures: Measure[]; rest: string } {
     });
   }
 
-  if (measures.length === 0) return { measures: [], rest: text };
+  if (measures.length === 0) {
+    return { measures: [], rest: text };
+  }
   return { measures, rest: text.slice(close + 1).trimStart() };
 }
 
@@ -572,10 +641,14 @@ function takeSlashAlternates(text: string): { measures: Measure[]; rest: string 
     const after = rest.slice(1).trimStart();
     const range = parseLeadingRange(after);
     const quantity = range ?? parseLeadingQuantity(after);
-    if (!quantity) break;
+    if (!quantity) {
+      break;
+    }
 
     const taken = matchLeadingUnit(after.slice(quantity.length).trimStart());
-    if (!taken) break;
+    if (!taken) {
+      break;
+    }
 
     measures.push({
       amount: quantity.amount,
@@ -610,17 +683,25 @@ export interface ParsedRange extends ParsedQuantity {
  */
 export function parseLeadingRange(text: string): ParsedRange | null {
   const low = parseLeadingQuantity(text);
-  if (!low) return null;
+  if (!low) {
+    return null;
+  }
 
   const after = text.slice(low.length);
   const separator = /^\s*(à|a|ou|-|–|—|\/)\s*/.exec(after);
-  if (!separator) return null;
+  if (!separator) {
+    return null;
+  }
   // A slash between two numbers is a fraction, which parseLeadingQuantity has
   // already consumed if it was one.
-  if (separator[1] === "/") return null;
+  if (separator[1] === "/") {
+    return null;
+  }
 
   const high = parseLeadingQuantity(after.slice(separator[0].length));
-  if (!high || high.amount <= low.amount) return null;
+  if (!high || high.amount <= low.amount) {
+    return null;
+  }
 
   return {
     amount: low.amount,
@@ -657,13 +738,19 @@ export function formatAmount(amount: number, options: FormatAmountOptions = {}):
     return String(rounded).replace(".", ",");
   };
 
-  if (!Number.isFinite(amount)) return "";
-  if (Number.isInteger(amount)) return String(amount);
-  if (options.fractions === false) return decimal(amount);
+  if (!Number.isFinite(amount)) {
+    return "";
+  }
+  if (Number.isInteger(amount)) {
+    return String(amount);
+  }
+  if (options.fractions === false) {
+    return decimal(amount);
+  }
 
   const whole = Math.floor(amount);
   const rest = amount - whole;
-  const known: Array<[number, string]> = [
+  const known: [number, string][] = [
     [0.25, "1/4"],
     [1 / 3, "1/3"],
     [0.5, "1/2"],

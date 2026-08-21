@@ -44,7 +44,9 @@ export function isMarmitonHost(rawUrl: string): boolean {
   } catch {
     return false;
   }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    return false;
+  }
   return ALLOWED_HOSTS.has(parsed.hostname.toLowerCase());
 }
 
@@ -52,7 +54,9 @@ export function isMarmitonHost(rawUrl: string): boolean {
 export function extractRecipeId(hrefOrUrl: string): string | null {
   let path = hrefOrUrl;
   if (/^https?:\/\//i.test(hrefOrUrl)) {
-    if (!isMarmitonHost(hrefOrUrl)) return null;
+    if (!isMarmitonHost(hrefOrUrl)) {
+      return null;
+    }
     path = new URL(hrefOrUrl).pathname;
   }
   const match = RECIPE_PATH_RE.exec(path);

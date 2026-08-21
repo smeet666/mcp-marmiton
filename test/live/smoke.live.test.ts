@@ -79,7 +79,9 @@ describe.runIf(enabled)("live Marmiton", () => {
 
     for (const entry of scaled) {
       expect(entry.original).not.toBe("");
-      if (entry.scaling === "unscaled") expect(entry.text).toBe(entry.original);
+      if (entry.scaling === "unscaled") {
+        expect(entry.text).toBe(entry.original);
+      }
       // Halving must never ask for more than the original recipe.
       if (entry.amount !== null && entry.scaling !== "unscaled") {
         expect(entry.amount).toBeGreaterThan(0);

@@ -129,7 +129,9 @@ describe("RateLimiter", () => {
 
   it("never exceeds the ceiling however often it is penalised", () => {
     const limiter = new RateLimiter({ minIntervalMs: 1000, maxIntervalMs: 8000 });
-    for (let i = 0; i < 20; i += 1) limiter.penalize();
+    for (let i = 0; i < 20; i += 1) {
+      limiter.penalize();
+    }
     expect(limiter.currentIntervalMs).toBeLessThanOrEqual(8000);
   });
 
@@ -140,7 +142,9 @@ describe("RateLimiter", () => {
     const penalised = limiter.currentIntervalMs;
     limiter.relax();
     expect(limiter.currentIntervalMs).toBeLessThan(penalised);
-    for (let i = 0; i < 20; i += 1) limiter.relax();
+    for (let i = 0; i < 20; i += 1) {
+      limiter.relax();
+    }
     expect(limiter.currentIntervalMs).toBe(1000);
   });
 

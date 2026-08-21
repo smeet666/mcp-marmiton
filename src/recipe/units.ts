@@ -212,12 +212,20 @@ const NOT_A_MEASURE = new Set([
  */
 export function readPartitiveMeasure(text: string): { unit: UnitInfo; rest: string } | null {
   const match = /^\s*(\p{L}+)\s+(?=(?:de|du|des)\s|d')/u.exec(text);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
 
   const [word = ""] = match.slice(1);
-  if (word.length < 3) return null;
-  if (NOT_A_MEASURE.has(normalizeUnitKey(word))) return null;
-  if (lookupUnit(word)) return null;
+  if (word.length < 3) {
+    return null;
+  }
+  if (NOT_A_MEASURE.has(normalizeUnitKey(word))) {
+    return null;
+  }
+  if (lookupUnit(word)) {
+    return null;
+  }
 
   const canonical = frenchSingular(word);
   return {
@@ -235,18 +243,32 @@ export function readPartitiveMeasure(text: string): { unit: UnitInfo; rest: stri
  * alone.
  */
 function frenchSingular(word: string): string {
-  if (/eaux$/i.test(word)) return word.slice(0, -1);
-  if (/aux$/i.test(word)) return `${word.slice(0, -3)}al`;
-  if (/[aiou]s$/i.test(word)) return word;
-  if (/s$/i.test(word) && word.length > 3) return word.slice(0, -1);
+  if (/eaux$/i.test(word)) {
+    return word.slice(0, -1);
+  }
+  if (/aux$/i.test(word)) {
+    return `${word.slice(0, -3)}al`;
+  }
+  if (/[aiou]s$/i.test(word)) {
+    return word;
+  }
+  if (/s$/i.test(word) && word.length > 3) {
+    return word.slice(0, -1);
+  }
   return word;
 }
 
 /** The plural French writes for a noun, or the noun itself when it takes no mark. */
 function frenchPlural(word: string): string {
-  if (/[sxz]$/i.test(word)) return word;
-  if (/eau$/i.test(word)) return `${word}x`;
-  if (/al$/i.test(word)) return `${word.slice(0, -2)}aux`;
+  if (/[sxz]$/i.test(word)) {
+    return word;
+  }
+  if (/eau$/i.test(word)) {
+    return `${word}x`;
+  }
+  if (/al$/i.test(word)) {
+    return `${word.slice(0, -2)}aux`;
+  }
   return `${word}s`;
 }
 
@@ -294,7 +316,9 @@ const DEMOTIONS: Record<string, UnitStep> = {
  */
 export function demoteUnit(unit: UnitInfo): { unit: UnitInfo; per: number } | null {
   const step = DEMOTIONS[unit.canonical];
-  if (!step) return null;
+  if (!step) {
+    return null;
+  }
   const target = lookupUnit(step.to);
   return target ? { unit: target, per: step.per } : null;
 }
@@ -329,7 +353,9 @@ export type Divisibility =
  * `QUARTERED_MEASURE`.
  */
 export function unitDivisibility(unit: UnitInfo): Divisibility {
-  if (unit.kind === "vague") return "whole";
+  if (unit.kind === "vague") {
+    return "whole";
+  }
   return QUARTERED_MEASURE.test(unit.canonical) ? "quarter" : "half";
 }
 
@@ -389,7 +415,9 @@ export function chooseReadableUnit(unit: UnitInfo, amount: number): ChosenUnit {
 
   while (amount * ratio < 1) {
     const step = demoteUnit(current);
-    if (!step) break;
+    if (!step) {
+      break;
+    }
     ratio *= step.per;
     current = step.unit;
   }
@@ -458,8 +486,14 @@ export function approximateEquivalent(unit: UnitInfo): string | null {
  * à soupe", not "1,5 cuillères".
  */
 export function formatUnit(unit: UnitInfo, amount: number): string {
-  if (unit.symbol) return unit.canonical;
-  if (amount < 2) return unit.canonical;
-  if (unit.plural) return unit.plural;
+  if (unit.symbol) {
+    return unit.canonical;
+  }
+  if (amount < 2) {
+    return unit.canonical;
+  }
+  if (unit.plural) {
+    return unit.plural;
+  }
   return `${unit.canonical}s`;
 }
