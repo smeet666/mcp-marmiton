@@ -8,7 +8,7 @@
 
 import type { Config, Logger } from "../config.js";
 import { MarmitonError, notFound, rateLimited, upstreamError } from "../errors.js";
-import { RateLimiter, sleep } from "./rateLimiter.js";
+import { type RateLimiter, sleep } from "./rateLimiter.js";
 
 const BACKOFF_BASE_MS = 2000;
 const BACKOFF_FACTOR = 2;

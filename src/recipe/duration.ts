@@ -64,7 +64,8 @@ export function parseYield(value: unknown): ParsedYield {
   const match = /^(\d+(?:[.,]\d+)?)\s*(.*)$/.exec(text);
   if (!match) return { count: null, unit: null, text };
 
-  const count = Number(match[1]!.replace(",", "."));
+  const [digits = ""] = match.slice(1);
+  const count = Number(digits.replace(",", "."));
   const unit = (match[2] ?? "").trim() || null;
   return { count: Number.isFinite(count) ? count : null, unit, text };
 }

@@ -14,8 +14,7 @@ export function extractJsonLdNodes(html: string): unknown[] {
   const nodes: unknown[] = [];
   LD_JSON_BLOCK.lastIndex = 0;
 
-  let match: RegExpExecArray | null;
-  while ((match = LD_JSON_BLOCK.exec(html)) !== null) {
+  for (let match = LD_JSON_BLOCK.exec(html); match !== null; match = LD_JSON_BLOCK.exec(html)) {
     const raw = match[1]?.trim();
     if (!raw) continue;
 
