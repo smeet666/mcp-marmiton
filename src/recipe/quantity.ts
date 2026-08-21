@@ -449,6 +449,49 @@ function alternateStyleOf(slashed: boolean, bracketed: boolean): "slash" | "brac
 }
 
 /**
+ * The measure standing after the amount, and the size word in front of it.
+ *
+ * The adjective is only an adjective when a measure stands behind it. In
+ * "1 petit piment oiseau" the words that follow name the food itself, and
+ * taking one off would hand back a line the page never wrote.
+ */
+function readMeasure(
+  text: string,
+  fromArticle: boolean,
+): { unit: UnitInfo | null; unitText: string | null; adjective: string | null; rest: string } {
+  const direct = matchLeadingUnit(text, fromArticle);
+  const described = direct ? { adjective: null, rest: text } : takeMeasureAdjective(text);
+  const behind = described.adjective ? matchLeadingUnit(described.rest, fromArticle) : null;
+  const matched = direct ?? behind;
+
+  return {
+    unit: matched?.unit ?? null,
+    unitText: matched?.unitText ?? null,
+    adjective: behind ? described.adjective : null,
+    rest: matched ? matched.rest : text,
+  };
+}
+
+/**
+ * Whether the figures on the line give the size of one item rather than how
+ * many of them the recipe wants.
+ *
+ * Two ways a line says it. Without a measure, the words behind the count carry
+ * the mass: "2 poulets de 1,5 kg". With one, "une dinde de 3 kg" writes the
+ * noun where a measure stands and the partitive takes it for one. A noun the
+ * vocabulary lists as a measure keeps counting, since a pot or a boîte is a
+ * thing to buy more of; a noun read as a measure only for standing there names
+ * the food itself, and a mass behind it is the size of one of them.
+ */
+function statesSizeOfOne(unit: UnitInfo | null, unitText: string | null, item: string): boolean {
+  if (!unit) {
+    return statesItemSize(item);
+  }
+  const readForItsPosition = unitText !== null && lookupUnit(normalizeUnitKey(unitText)) === null;
+  return readForItsPosition && isStatedSize(item);
+}
+
+/**
  * Split an ingredient line into amount, unit, bracketed equivalents and item.
  *
  * A missing amount is normal and not an error: many lines are just "sel". A
@@ -507,20 +550,9 @@ export function parseIngredient(line: string): ParsedIngredient {
   const times = multiplier?.times ?? 1;
 
   const fromArticle = quantity === article;
-  const direct = matchLeadingUnit(rest, fromArticle);
-  const described = direct ? { adjective: null, rest } : takeMeasureAdjective(rest);
-  // The adjective is only an adjective when a measure stands behind it. In
-  // "1 petit piment oiseau" the words that follow name the food itself, and
-  // taking one off would hand back a line the page never wrote.
-  const behind = described.adjective ? matchLeadingUnit(described.rest, fromArticle) : null;
-  const matched = direct ?? behind;
-  const adjective = behind ? described.adjective : null;
-
-  const unit = matched?.unit ?? null;
-  const unitText = matched?.unitText ?? null;
-  if (matched) {
-    rest = matched.rest;
-  }
+  const measure = readMeasure(rest, fromArticle);
+  const { unit, unitText, adjective } = measure;
+  rest = measure.rest;
 
   const bracketed = takeAlternates(rest);
   rest = bracketed.rest;
@@ -541,19 +573,7 @@ export function parseIngredient(line: string): ParsedIngredient {
     .replace(/^(?:une|un)\s+/i, "")
     .trim();
 
-  // A counted thing whose size the line states: the number the line opens with
-  // is one bird, and the measure behind it is what that bird weighs.
-  if (!unit && statesItemSize(item)) {
-    return empty("itemSize");
-  }
-
-  // "une dinde de 3 kg" writes the noun where a measure stands, and the
-  // partitive takes it for one. A noun the vocabulary lists as a measure keeps
-  // counting, since a pot or a boîte is a thing to buy more of; a noun read as
-  // a measure only for standing there names the food itself, and a mass behind
-  // it is the size of one of them.
-  const readForItsPosition = unitText !== null && lookupUnit(normalizeUnitKey(unitText)) === null;
-  if (unit && readForItsPosition && isStatedSize(item)) {
+  if (statesSizeOfOne(unit, unitText, item)) {
     return empty("itemSize");
   }
 
