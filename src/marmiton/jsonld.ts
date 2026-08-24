@@ -70,7 +70,9 @@ export function hasType(node: unknown, type: string): boolean {
 
 export function findNodeOfType(nodes: unknown[], type: string): Record<string, unknown> | null {
   const found = nodes.find((node) => hasType(node, type));
-  return (found as Record<string, unknown>) ?? null;
+  // The cast reads what the search found; putting it before the coalesce would
+  // assert the node exists and leave the null branch unreachable.
+  return found === undefined ? null : (found as Record<string, unknown>);
 }
 
 /** Read a string field, tolerating the array form schema.org allows. */

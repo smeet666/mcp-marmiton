@@ -25,7 +25,10 @@ const TEST_CONFIG = {
   logLevel: "silent" as const,
 };
 
-type Routes = { search?: string; recipe?: string };
+interface Routes {
+  search?: string;
+  recipe?: string;
+}
 
 const openClients: Array<() => Promise<void>> = [];
 
