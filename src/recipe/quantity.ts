@@ -9,6 +9,20 @@
 import type { UnitInfo } from "./units.js";
 import { lookupUnit, normalizeUnitKey, readPartitiveMeasure, UNIT_KEYS } from "./units.js";
 
+const MIXED_FRACTION = /^(\d+)\s+(\d+)\s*\/\s*(\d+)/;
+const SIMPLE_FRACTION = /^(\d+)\s*\/\s*(\d+)/;
+const DECIMAL = /^(\d+(?:[.,]\d+)?)/;
+const VAGUE_ARTICLE = /^\s*(un|une|quelques)\b\s*/i;
+const LEADING_WORD = /^\s*(\p{L}+)\s+/u;
+const WHITESPACE = /\s+/;
+const ATTACHED_DE = /\s+de\s+(?=\d)/i;
+const DIGIT = /\d/;
+const TRAILING_S = /s$/;
+const HYPHENATED_TAIL = /^-\p{L}/u;
+const LEADING_PARTITIVE = /^(?:de\s+la\s+|de\s+l'|d'|de\s+|du\s+|des\s+)/i;
+const LEADING_ARTICLE = /^(?:une|un)\s+/i;
+const RANGE_SEPARATOR = /^\s*(à|a|ou|-|–|—|\/)\s*/;
+
 export interface ParsedQuantity {
   amount: number;
   /** Characters consumed from the start of the line. */
@@ -59,7 +73,7 @@ export function parseLeadingQuantity(text: string): ParsedQuantity | null {
   }
 
   // "1 1/2" before "1/2" before "1,5", so the longest reading wins.
-  const mixed = /^(\d+)\s+(\d+)\s*\/\s*(\d+)/.exec(trimmed);
+  const mixed = MIXED_FRACTION.exec(trimmed);
   if (mixed) {
     const whole = Number(mixed[1]);
     const numerator = Number(mixed[2]);
@@ -69,7 +83,7 @@ export function parseLeadingQuantity(text: string): ParsedQuantity | null {
     }
   }
 
-  const fraction = /^(\d+)\s*\/\s*(\d+)/.exec(trimmed);
+  const fraction = SIMPLE_FRACTION.exec(trimmed);
   if (fraction) {
     const denominator = Number(fraction[2]);
     if (denominator !== 0) {
@@ -78,7 +92,7 @@ export function parseLeadingQuantity(text: string): ParsedQuantity | null {
   }
 
   // French marks the decimal with a comma, so "1,5 kg" is a kilo and a half.
-  const decimal = /^(\d+(?:[.,]\d+)?)/.exec(trimmed);
+  const decimal = DECIMAL.exec(trimmed);
   if (decimal) {
     const [digits = ""] = decimal.slice(1);
     const amount = Number(digits.replace(",", "."));
@@ -116,7 +130,7 @@ export interface ParsedArticle extends ParsedQuantity {
  * second as the first would multiply a number the line never wrote.
  */
 export function parseLeadingArticle(text: string): ParsedArticle | null {
-  const match = /^\s*(un|une|quelques)\b\s*/i.exec(text);
+  const match = VAGUE_ARTICLE.exec(text);
   if (!match) {
     return null;
   }
@@ -152,7 +166,7 @@ const COUNT_MULTIPLIERS: Record<string, number> = {
 
 /** The multiplier a line opens with, and what stands after it. */
 function readCountMultiplier(text: string): { times: number; rest: string } | null {
-  const match = /^\s*(\p{L}+)\s+/u.exec(text);
+  const match = LEADING_WORD.exec(text);
   if (!match) {
     return null;
   }
@@ -199,7 +213,7 @@ function matchLeadingUnit(text: string, partitive = false): MatchedUnit | null {
     // Consume the same number of words from the original text, which may be
     // spelled with accents the normalized key has lost.
     const wordCount = key.split(" ").length;
-    const words = text.trim().split(/\s+/);
+    const words = text.trim().split(WHITESPACE);
     return {
       unit,
       unitText: words.slice(0, wordCount).join(" "),
@@ -211,7 +225,7 @@ function matchLeadingUnit(text: string, partitive = false): MatchedUnit | null {
   if (measure) {
     return {
       unit: measure.unit,
-      unitText: text.trim().split(/\s+/)[0] ?? "",
+      unitText: text.trim().split(WHITESPACE)[0] ?? "",
       rest: measure.rest,
     };
   }
@@ -339,13 +353,13 @@ const CONTAINER_CONTENTS = /^\s*(?:de\s|d'|du\s|des\s)/i;
  * that line counts grams, and its bracket restates the same quantity.
  */
 function statesItemSize(item: string): boolean {
-  const attached = /\s+de\s+(?=\d)/i.exec(item);
+  const attached = ATTACHED_DE.exec(item);
   if (!attached) {
     return false;
   }
 
   const named = item.slice(0, attached.index).trim();
-  if (!named || /\d/.test(named)) {
+  if (!named || DIGIT.test(named)) {
     return false;
   }
 
@@ -414,7 +428,7 @@ function fold(word: string): string {
 
 /** The adjective a line put in front of its measure, and what stands after it. */
 function takeMeasureAdjective(text: string): { adjective: string | null; rest: string } {
-  const match = /^\s*(\p{L}+)\s+/u.exec(text);
+  const match = LEADING_WORD.exec(text);
   if (!match) {
     return { adjective: null, rest: text };
   }
@@ -423,7 +437,8 @@ function takeMeasureAdjective(text: string): { adjective: string | null; rest: s
   const folded = fold(adjective);
   // The word can be written in the plural where the count is, as in "2 grosses
   // cuillères", and the list carries the singular.
-  const listed = MEASURE_ADJECTIVES.has(folded) || MEASURE_ADJECTIVES.has(folded.replace(/s$/, ""));
+  const listed =
+    MEASURE_ADJECTIVES.has(folded) || MEASURE_ADJECTIVES.has(folded.replace(TRAILING_S, ""));
   if (!listed) {
     return { adjective: null, rest: text };
   }
@@ -534,7 +549,7 @@ export function parseIngredient(line: string): ParsedIngredient {
 
   // A figure joined to a word by a hyphen describes one thing rather than
   // counting things: "2 tranches de 2-cm" states a thickness.
-  if (/^-\p{L}/u.test(stated.slice(quantity.length))) {
+  if (HYPHENATED_TAIL.test(stated.slice(quantity.length))) {
     return empty("sizeQualifier");
   }
 
@@ -568,10 +583,7 @@ export function parseIngredient(line: string): ParsedIngredient {
   // share of one flacon, and once the share has been multiplied the count sits
   // where "un" stood. Leaving the article behind produces "4 un flacon", which
   // reads as broken text rather than as a quantity.
-  const item = rest
-    .replace(/^(?:de\s+la\s+|de\s+l'|d'|de\s+|du\s+|des\s+)/i, "")
-    .replace(/^(?:une|un)\s+/i, "")
-    .trim();
+  const item = rest.replace(LEADING_PARTITIVE, "").replace(LEADING_ARTICLE, "").trim();
 
   if (statesSizeOfOne(unit, unitText, item)) {
     return empty("itemSize");
@@ -708,7 +720,7 @@ export function parseLeadingRange(text: string): ParsedRange | null {
   }
 
   const after = text.slice(low.length);
-  const separator = /^\s*(à|a|ou|-|–|—|\/)\s*/.exec(after);
+  const separator = RANGE_SEPARATOR.exec(after);
   if (!separator) {
     return null;
   }

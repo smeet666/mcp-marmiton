@@ -4,6 +4,8 @@
  * Marmiton writes "PT25M" for 25 minutes and "PT1H30M" for an hour and a half.
  */
 
+const NUMBER_AND_REST = /^(\d+(?:[.,]\d+)?)\s*(.*)$/;
+
 const ISO_DURATION = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/;
 
 /** Minutes, or null when the value is absent or unreadable. */
@@ -84,7 +86,7 @@ export function parseYield(value: unknown): ParsedYield {
     return { count: null, unit: null, text: "" };
   }
 
-  const match = /^(\d+(?:[.,]\d+)?)\s*(.*)$/.exec(text);
+  const match = NUMBER_AND_REST.exec(text);
   if (!match) {
     return { count: null, unit: null, text };
   }

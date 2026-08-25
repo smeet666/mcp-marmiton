@@ -13,6 +13,9 @@ import { strictInput } from "./arguments.js";
 import { ok, scaledIngredientSchema, toToolError } from "./shared.js";
 import type { ToolResult } from "./shared.js";
 
+/** The note a scaling that could not go lower leaves on an ingredient. */
+const CLAMPED_UP = /clamped up/i;
+
 export const scaleIngredientsDescription = [
   "Rescale a list of ingredient lines to a different number of servings, without contacting any website.",
   "Give either 'factor' directly, or 'from_servings' and 'to_servings' and the factor is computed.",
@@ -107,7 +110,7 @@ export function runScaleIngredients(args: ScaleIngredientsArgs): ToolResult {
       // the roundable category: at a factor of 100 every egg lands whole.
       rounded: ingredients.filter((entry) => entry.scaling === "rounded" && entry.adjusted).length,
       unscaled: ingredients.filter((entry) => entry.scaling === "unscaled").length,
-      clamped: ingredients.filter((entry) => /clamped up/i.test(entry.note ?? "")).length,
+      clamped: ingredients.filter((entry) => CLAMPED_UP.test(entry.note ?? "")).length,
       approximate: ingredients.filter(isApproximateMeasure).length,
     };
 

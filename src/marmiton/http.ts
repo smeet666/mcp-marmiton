@@ -10,6 +10,8 @@ import type { Config, Logger } from "../config.js";
 import { MarmitonError, notFound, rateLimited, upstreamError } from "../errors.js";
 import { type RateLimiter, sleep } from "./rateLimiter.js";
 
+const CLOSING_HTML_TAG = /<\/html>/i;
+
 const BACKOFF_BASE_MS = 2000;
 const BACKOFF_FACTOR = 2;
 const BACKOFF_MAX_MS = 20_000;
@@ -82,7 +84,7 @@ function readAnswer(
   }
 
   const trimmed = body.trim();
-  if (trimmed.length < MIN_PLAUSIBLE_HTML && !/<\/html>/i.test(trimmed)) {
+  if (trimmed.length < MIN_PLAUSIBLE_HTML && !CLOSING_HTML_TAG.test(trimmed)) {
     // Too small to be a page: treat it as a refusal rather than parse it and
     // report an empty result.
     return {
