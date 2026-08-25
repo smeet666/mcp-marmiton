@@ -122,7 +122,7 @@ export function parseLeadingArticle(text: string): ParsedArticle | null {
   }
 
   const rest = text.slice(match[0].length);
-  if (!matchLeadingUnit(rest, true) && !readCountMultiplier(rest)) {
+  if (!(matchLeadingUnit(rest, true) || readCountMultiplier(rest))) {
     return null;
   }
 

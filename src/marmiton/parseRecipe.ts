@@ -7,6 +7,7 @@
  * server has no business redistributing it.
  */
 
+import process from "node:process";
 import { parseFailure } from "../errors.js";
 import { parseIsoDuration, parseYield } from "../recipe/duration.js";
 import type { Nutrition, Rating, Recipe, RecipeSummary } from "../types.js";
@@ -125,7 +126,7 @@ export function parseSearchPage(html: string, url: string): RecipeSummary[] {
     const title = asString(record.name);
     const id = href ? extractRecipeId(href) : null;
 
-    if (!href || !title || !id) {
+    if (!(href && title && id)) {
       skipped += 1;
       continue;
     }
