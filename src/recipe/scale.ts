@@ -1126,7 +1126,7 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
     adjusted,
   };
 
-  result.note = noteForScaledLine({
+  const note = noteForScaledLine({
     parsed,
     bounds: primaryBounds,
     unit,
@@ -1137,6 +1137,9 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
     restated,
     collapsed,
   });
+  if (note !== undefined) {
+    result.note = note;
+  }
 
   return result;
 }
