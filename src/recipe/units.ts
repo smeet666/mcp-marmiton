@@ -7,6 +7,16 @@
  * the count is what carries the recipe's proportion.
  */
 
+const HEAD_BEFORE_DE = /^\s*(\p{L}+)\s+(?=(?:de|du|des)\s|d')/u;
+const AUX_ENDING = /aux$/i;
+const EAUX_ENDING = /eaux$/i;
+const VOWEL_THEN_S = /[aiou]s$/i;
+const TRAILING_S = /s$/i;
+const SIBILANT_ENDING = /[sxz]$/i;
+const EAU_ENDING = /eau$/i;
+const AL_ENDING = /al$/i;
+const HOUSEHOLD_MEASURE = /^(cuillère à soupe|cuillère à café|verre|tasse|bol)$/;
+
 export type UnitKind =
   /** Mass or volume: scales continuously and cleanly. */
   | "measured"
@@ -211,7 +221,7 @@ const NOT_A_MEASURE = new Set([
  * number where the recipe wrote none.
  */
 export function readPartitiveMeasure(text: string): { unit: UnitInfo; rest: string } | null {
-  const match = /^\s*(\p{L}+)\s+(?=(?:de|du|des)\s|d')/u.exec(text);
+  const match = HEAD_BEFORE_DE.exec(text);
   if (!match) {
     return null;
   }
@@ -243,16 +253,16 @@ export function readPartitiveMeasure(text: string): { unit: UnitInfo; rest: stri
  * alone.
  */
 function frenchSingular(word: string): string {
-  if (/eaux$/i.test(word)) {
+  if (EAUX_ENDING.test(word)) {
     return word.slice(0, -1);
   }
-  if (/aux$/i.test(word)) {
+  if (AUX_ENDING.test(word)) {
     return `${word.slice(0, -3)}al`;
   }
-  if (/[aiou]s$/i.test(word)) {
+  if (VOWEL_THEN_S.test(word)) {
     return word;
   }
-  if (/s$/i.test(word) && word.length > 3) {
+  if (TRAILING_S.test(word) && word.length > 3) {
     return word.slice(0, -1);
   }
   return word;
@@ -260,13 +270,13 @@ function frenchSingular(word: string): string {
 
 /** The plural French writes for a noun, or the noun itself when it takes no mark. */
 function frenchPlural(word: string): string {
-  if (/[sxz]$/i.test(word)) {
+  if (SIBILANT_ENDING.test(word)) {
     return word;
   }
-  if (/eau$/i.test(word)) {
+  if (EAU_ENDING.test(word)) {
     return `${word}x`;
   }
-  if (/al$/i.test(word)) {
+  if (AL_ENDING.test(word)) {
     return `${word.slice(0, -2)}aux`;
   }
   return `${word}s`;
@@ -382,7 +392,7 @@ export const QUARTERED_MEASURE = /\b(pots?|bouteilles?|tranches?)\b/;
  * out in the fractions printed on a measuring set rather than in halves alone.
  */
 export function isSpoonMeasure(unit: UnitInfo): boolean {
-  return /^(cuillère à soupe|cuillère à café|verre|tasse|bol)$/.test(unit.canonical);
+  return HOUSEHOLD_MEASURE.test(unit.canonical);
 }
 
 export interface ChosenUnit {

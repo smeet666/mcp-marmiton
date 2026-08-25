@@ -27,6 +27,17 @@ import {
   unitDivisibility,
 } from "./units.js";
 
+const DASH_ONLY = /^[-–—]$/;
+const EGG_WHITE = /\bblancs? de? /;
+const EGG_WHITE_NAMED = /\bblancs? de? oeufs?\b/;
+const PLURAL_ENDING = /s$|eaux$|aux$/i;
+const SIBILANT_ENDING = /[sxz]$/i;
+const EAU_ENDING = /eau$/i;
+const AL_ENDING = /al$/i;
+const EAUX_ENDING = /eaux$/i;
+const AUX_ENDING = /aux$/i;
+const VOWEL_OPENING = /^[aeiouàâäéèêëîïôöûü]/i;
+
 export type ScalingKind =
   /** The arithmetic was exact. */
   | "scaled"
@@ -200,10 +211,10 @@ const WHOLE_ITEM = /\b(oeufs?|jaunes?|clous?|zestes?)\b/;
 function blancDivisibility(key: string): Divisibility | null {
   // The noun is the one followed by what it is the blanc of. "vin blanc" and
   // "oignon blanc" use the same letters as a colour and count as neither.
-  if (!/\bblancs? de? /.test(key)) {
+  if (!EGG_WHITE.test(key)) {
     return null;
   }
-  return /\bblancs? de? oeufs?\b/.test(key) ? "whole" : "half";
+  return EGG_WHITE_NAMED.test(key) ? "whole" : "half";
 }
 
 /** How finely the thing a line counts can be divided. */
@@ -549,25 +560,25 @@ function agreeWithAmount(item: string, amount: number): string {
   }
 
   const wantsPlural = amount >= 2;
-  const isPlural = /s$|eaux$|aux$/i.test(head);
+  const isPlural = PLURAL_ENDING.test(head);
 
   if (wantsPlural && !isPlural) {
     // Words ending in -s, -x or -z do not take a plural mark.
-    if (/[sxz]$/i.test(head)) {
+    if (SIBILANT_ENDING.test(head)) {
       // The head stays as written.
     }
     // "morceau" and "bocal" take -x and -aux where the ordinary noun takes -s.
-    else if (/eau$/i.test(head)) {
+    else if (EAU_ENDING.test(head)) {
       words[0] = `${head}x`;
-    } else if (/al$/i.test(head)) {
+    } else if (AL_ENDING.test(head)) {
       words[0] = `${head.slice(0, -2)}aux`;
     } else {
       words[0] = `${head}s`;
     }
   } else if (!wantsPlural && isPlural) {
-    if (/eaux$/i.test(head)) {
+    if (EAUX_ENDING.test(head)) {
       words[0] = head.slice(0, -1);
-    } else if (/aux$/i.test(head)) {
+    } else if (AUX_ENDING.test(head)) {
       words[0] = `${head.slice(0, -3)}al`;
     }
     // "ananas", "anis", "couscous": the -s belongs to the singular.
@@ -725,7 +736,7 @@ function joinItem(item: string): string {
   if (!item) {
     return "";
   }
-  const elides = /^[aeiouàâäéèêëîïôöûü]/i.test(item) || MUTE_H_WORDS.test(item);
+  const elides = VOWEL_OPENING.test(item) || MUTE_H_WORDS.test(item);
   return elides ? ` d'${item}` : ` de ${item}`;
 }
 
@@ -1192,7 +1203,7 @@ function renderRange(low: string, high: string | null, separator: string | null)
   if (high === null || separator === null) {
     return low;
   }
-  return /^[-–—]$/.test(separator) ? `${low}${separator}${high}` : `${low} ${separator} ${high}`;
+  return DASH_ONLY.test(separator) ? `${low}${separator}${high}` : `${low} ${separator} ${high}`;
 }
 
 export function scaleIngredients(lines: string[], options: ScaleOptions): ScaledIngredient[] {

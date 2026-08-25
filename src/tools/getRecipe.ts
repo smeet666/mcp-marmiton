@@ -11,6 +11,9 @@ import { strictInput } from "./arguments.js";
 import { ok, scaledIngredientSchema, toToolError } from "./shared.js";
 import type { ToolResult } from "./shared.js";
 
+/** The note a scaling that could not go lower leaves on an ingredient. */
+const CLAMPED_UP = /clamped up/i;
+
 export const getRecipeDescription = [
   "Read one Marmiton recipe: ingredients, steps, times, category, rating and nutrition.",
   "Give the id returned by search_recipes, or a marmiton.org recipe URL.",
@@ -102,7 +105,7 @@ function rescalingNotes(ingredients: readonly ScaledIngredient[], hasNutrition: 
     notes.push(`${rounded} quantity(ies) were rounded to remain usable; see the 'scaling' field.`);
   }
 
-  const clamped = ingredients.filter((entry) => /clamped up/i.test(entry.note ?? "")).length;
+  const clamped = ingredients.filter((entry) => CLAMPED_UP.test(entry.note ?? "")).length;
   if (clamped > 0) {
     notes.push(
       `${clamped} quantity(ies) fell below the smallest amount worth measuring and were ` +
