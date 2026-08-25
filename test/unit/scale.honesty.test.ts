@@ -100,7 +100,7 @@ describe("measured quantities", () => {
   });
 
   it("never rounds a measured quantity away to nothing", () => {
-    const result = scale("1 kg de farine", 0.0000001);
+    const result = scale("1 kg de farine", 0.000_000_1);
 
     expect(result.amount).toBeGreaterThan(0);
   });

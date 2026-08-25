@@ -12,6 +12,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import process from "node:process";
 
 const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "test", "fixtures");
 
@@ -140,11 +141,11 @@ const FIXTURES = {
     {
       "@type": "ItemList",
       itemListElement: [
-        searchItem(1, 11111, "Tarte placeholder aux fruits"),
-        searchItem(2, 22222, "Tarte placeholder au chocolat"),
-        searchItem(3, 33333, "Gâteau placeholder"),
-        searchItem(4, 44444, "Clafoutis placeholder"),
-        searchItem(5, 55555, "Crumble placeholder"),
+        searchItem(1, 11_111, "Tarte placeholder aux fruits"),
+        searchItem(2, 22_222, "Tarte placeholder au chocolat"),
+        searchItem(3, 33_333, "Gâteau placeholder"),
+        searchItem(4, 44_444, "Clafoutis placeholder"),
+        searchItem(5, 55_555, "Crumble placeholder"),
         // An entry missing its URL, which must be skipped rather than crash.
         { "@type": "ListItem", position: 6, name: "Entrée cassée" },
       ],
