@@ -243,6 +243,14 @@ and the address written as one line.
 The recipes belong to Marmiton and to the cooks who wrote them. This MCP server
 is an unofficial project, with no affiliation to Marmiton.
 
+## Privacy
+
+This server collects nothing about you and sends nothing to its author. It runs
+on your machine, contacts `www.marmiton.org` and nothing else, holds its answers in memory
+while it runs, and writes nothing to disk.
+[PRIVACY.md](PRIVACY.md) states what a request carries and which settings change
+any of it.
+
 ## Development
 
 ```bash
@@ -507,6 +515,13 @@ l'auteur quand la page le nomme, ainsi qu'`attribution`, le titre et l'adresse
 
 Les recettes appartiennent à Marmiton et aux cuisiniers qui les ont écrites.
 Ce MCP est un projet non officiel, sans affiliation à Marmiton.
+
+## Confidentialité
+
+Ce serveur ne collecte rien sur vous et n'envoie rien à son auteur. Il tourne sur
+votre machine, ne joint que `www.marmiton.org`, garde ses réponses en mémoire le temps qu'il
+tourne, et n'écrit rien sur le disque. [PRIVACY.md](PRIVACY.md) dit ce qu'une
+requête emporte et quels réglages changent cela.
 
 ## Développement
 
