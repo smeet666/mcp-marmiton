@@ -1,6 +1,6 @@
 {
   "name": "mcp-marmiton",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "MCP server for Marmiton. Search recipes, read ingredients and steps, and scale quantities to any number of servings. No API key required.",
   "type": "module",
   "license": "MIT",

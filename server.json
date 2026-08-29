@@ -19,12 +19,12 @@
     "url": "https://github.com/smeet666/mcp-marmiton",
     "source": "github"
   },
-  "version": "2.0.0",
+  "version": "2.0.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "mcp-marmiton",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "transport": {
         "type": "stdio"
       },
@@ -48,8 +48,8 @@
     },
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/smeet666/mcp-marmiton/releases/download/v2.0.0/mcp-marmiton-2.0.0.mcpb",
-      "version": "2.0.0",
+      "identifier": "https://github.com/smeet666/mcp-marmiton/releases/download/v2.0.1/mcp-marmiton-2.0.1.mcpb",
+      "version": "2.0.1",
       "transport": {
         "type": "stdio"
       }
