@@ -8,18 +8,26 @@
 [![M8ven](https://m8ven.ai/badge/mcp/smeet666-mcp-marmiton-1f9qvs?variant=verified)](https://m8ven.ai/mcp/smeet666-mcp-marmiton-1f9qvs)
 [![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=marmiton&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIm1jcC1tYXJtaXRvbiJdfQ%3D%3D)
 [![Install in VS Code](https://img.shields.io/badge/VS_Code-Install-0098FF?style=flat&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=marmiton&config=%7B%22name%22%3A%22marmiton%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22mcp-marmiton%22%5D%7D)
+
 <!-- m8ven-verify: 67179fe5844dc3b97dbd373300cca0e0 -->
 
-An [MCP](https://modelcontextprotocol.io) server for [Marmiton](https://www.marmiton.org),
-the French recipe site. Search recipes, read their ingredients and steps, and
-**rescale the quantities to any number of servings**. **No API key, no account, no
-configuration.**
+[Marmiton](https://www.marmiton.org) is the largest French cooking site, where
+home cooks have been publishing their recipes since 1999. Each one gives its
+ingredients with their quantities, the steps to follow, the preparation and
+cooking times, the number of servings it is written for, and the ratings the
+people who made it left behind.
 
-_(Version française plus bas / [French version below](#mcp-marmiton-français))_
+This server connects a chat client to that site. You can search its recipes by
+dish or by ingredient, read one in full with its ingredients and its steps, and
+**rescale the quantities to the number of people at your table**, with each line
+saying whether the figure is exact or was moved to stay usable in a kitchen. It
+needs no API key and no account.
+
+_[Version française](#mcp-marmiton-français)_
 
 ---
 
-## Quickstart
+## Install
 
 **One-click install**
 
@@ -45,6 +53,8 @@ claude mcp add marmiton -- npx -y mcp-marmiton
 }
 ```
 
+Node 24 or later is required, and no environment variable has to be set.
+
 ### With Docker
 
 ```json
@@ -58,215 +68,212 @@ claude mcp add marmiton -- npx -y mcp-marmiton
 }
 ```
 
-`-i` keeps stdin open, which is where the protocol travels, and no `-t` is
-passed: a TTY rewrites the stream and breaks it. The container needs outbound
-HTTPS to `www.marmiton.org`, and nothing else: no volume, no port, no environment variable, no credential.
+`-i` keeps stdin open, which is where the protocol travels, and `-t` is left out
+because a TTY rewrites the stream. The container needs outbound HTTPS to
+`www.marmiton.org`, and nothing else: no volume, no port, no credential.
 
-**Bundle, without npm**
+### Bundle, without npm
 
-Download `mcp-marmiton-<version>.mcpb` from
-[the latest release](https://github.com/smeet666/mcp-marmiton/releases/latest) and open
-it. A client that supports MCP bundles installs it on its own, with no npm and
-no configuration file to edit. The bundle carries its dependencies, so nothing
-is fetched at install time.
+Download `mcp-marmiton-2.0.0.mcpb` from
+[the latest release](https://github.com/smeet666/mcp-marmiton/releases/latest)
+and open it. A client that supports MCP bundles installs it on its own, with no
+npm and no configuration file to edit. The bundle carries its dependencies, so
+nothing is fetched at install time.
+
+## What you can ask
+
+- « Trouve-moi une recette de tarte aux pommes. »
+- "Read me that recipe for six people instead of four."
+- "What can I make with courgettes and chèvre?"
+- "Here is a recipe I copied from a book, scale it by 1.5 for me."
+- "How long does the second one take to cook?"
+
+Marmiton is a French site, so its recipes are found in French: `tarte aux
+pommes`, `poulet curry coco`. The ordinary path runs from a search to a reading:
+`search_recipes` names an `id`, and `get_recipe` takes that id.
 
 ## Tools
 
-| Tool                | What it does                           | Key parameters                                          |
-| ------------------- | -------------------------------------- | ------------------------------------------------------- |
-| `search_recipes`    | Finds recipes by dish or ingredient.   | `query`, `limit`                                        |
-| `get_recipe`        | Reads one recipe, optionally rescaled. | `id`, `url`, `servings`                                 |
-| `scale_ingredients` | Rescales any ingredient list, offline. | `ingredients`, `factor`, `from_servings`, `to_servings` |
+| Tool                | What it does                                                   |
+| ------------------- | -------------------------------------------------------------- |
+| `search_recipes`    | Finds recipes by dish or by ingredient.                        |
+| `get_recipe`        | Reads one recipe, rescaled to a number of servings on request. |
+| `scale_ingredients` | Rescales any ingredient list, with no request to the site.     |
 
-Search returns a Marmiton `id` for every result; `get_recipe` takes that id. That
-is the intended chain: search, then read.
+The server only reads. It publishes nothing to Marmiton.
 
-The server is **read-only**. It never posts anything to Marmiton.
+### `search_recipes`
 
-### Scaling is the point
+Searches the recipes for a dish or an ingredient. Marmiton matches on the opening
+letters of a word, so a query brings back what the site ranked for it, and the
+answer says when the titles carry none of the words asked for.
 
-Asking a language model to divide a recipe by 1.5 tends to produce "2.4 eggs" and
-"0.67 pinches of salt", stated with the same confidence as a correct number. This
-server does the arithmetic itself and, more importantly, **says what it could not
-compute**. Every ingredient comes back with a `scaling` flag:
+| Argument | Type                           | Required | What it does                                |
+| -------- | ------------------------------ | -------- | ------------------------------------------- |
+| `query`  | string, up to 200 characters   | yes      | What to search for, in French.              |
+| `limit`  | integer, 1 to 30, default `10` | no       | Recipes to serve from this page of results. |
 
-| Flag       | Meaning                                            | Example                                  |
-| ---------- | -------------------------------------------------- | ---------------------------------------- |
-| `scaled`   | The value is the product itself.                   | `3 oeufs` ×2 → `6 oeufs`                 |
-| `rounded`  | The value had to be moved to stay usable.          | `25 cl de lait` ×0.667 → `17 cl de lait` |
-| `unscaled` | Carries no quantity, so left exactly as published. | `sel`, `coriandre`                       |
+**In return:** rows carrying `id`, which `get_recipe` takes; `title`; `url`; and
+`image_url`, which is `null` for a recipe published without a picture. Alongside
+come `result_count` and `total_available`, the recipes on this page before
+`limit` was applied. Marmiton's robots.txt disallows paging through search
+results, so one page is what a search reads: narrow the query to see other
+recipes.
 
-A count reaches an exact product as readily as a mass does: one pinch multiplied
-by six is six pinches, and that line is `scaled`. `rounded` is for a value that
-landed somewhere the arithmetic did not put it, a half egg taken to a whole one
-or 133.4 g written as 135 g.
+### `get_recipe`
 
-Two rules are enforced. Scaling a recipe **down never asks for more** than the
-original: half a sachet at factor 0.667 stays half a sachet, never a whole one.
-And scaling never **silently drops** an ingredient by rounding it to zero, which
-is why small amounts come back as fractions.
+Reads one recipe in full, and rescales its quantities when a number of servings
+is given.
 
-**A counted thing is divided by what it holds, not by what holds it.** A boîte de
-tomates is poured and the rest kept, a sachet de sucre vanillé is split by eye, a
-feuille de gélatine is cut with scissors, a branche de thym is broken in two: all
-of those land on a half. Half an oeuf would have to be
-beaten and weighed, which is not an amount a recipe asks for, so a count of oeufs,
-jaunes or blancs d'oeufs lands on a whole number. A few things are decided by what
-they are: a clou de girofle and a zeste are counted whole, a pot and a bouteille
-hold enough for a quarter to be a portion, a tranche is cut off
-something larger and the board takes a corner off it in the same gesture, a
-gousse d'ail is split in two and no finer, a blanc de poulet is
-meat and halves, and a douzaine states a number of things rather than a measure
-of them, so `2 douzaines d'escargots` at three quarters comes back as
-`18 escargots`.
+| Argument   | Type                          | Required   | What it does                                             |
+| ---------- | ----------------------------- | ---------- | -------------------------------------------------------- |
+| `id`       | string of digits              | one of two | The Marmiton recipe id, as `search_recipes` returned it. |
+| `url`      | a marmiton.org URL            | one of two | The address of the recipe, used when `id` is absent.     |
+| `servings` | number, above 0 and up to 500 | no         | Rescale the quantities to this many servings.            |
 
-**A thing counted on its own is divided by the size of one against what a recipe
-puts in.** Une crevette, une moule, une noisette, un grain de poivre, une baie de
-genièvre, un anis étoilé is already a portion: a recipe counts twelve of them
-and a smaller recipe puts one fewer in the pan, so they land on a whole number.
-Un gigot, une baguette, un camembert, un ananas, un oignon, une pastèque, une
-pintade, un poulet, un poireau sits at
-the other end of that comparison, asked for by the one or the two and shared out
-with a knife, so they go as far as the quarter. A cut carved off one of them
-stops at the half, une cuisse and une aile being the portion the knife already
-produced. Un jus stops at the half: half
-the jus of a citron is taken by squeezing half the fruit, and a quarter of one
-has to be poured out and measured back.
+**In return:** `title`, `url`, `ingredients`, `steps`, `prep_minutes`,
+`cook_minutes`, `total_minutes`, `category`, `author`, `rating` and `nutrition`,
+each `null` when the page publishes none. `yield` says what the recipe was
+written for and what it was rescaled to: `original_count`, `original_text`,
+`requested`, `unit` for what is being counted, and `factor` for the multiplier
+applied. Every ingredient carries `original`, `text`, `amount`, `amountMax` for a
+range, `unit`, and `scaling`, which reads `scaled`, `rounded` or `unscaled`. The
+figures are this server's arithmetic, so say they were recomputed when you show
+them. `nutrition` describes the recipe as published, at its own number of
+servings.
 
-Approximate measures are quantities too. A pinch, a handful, a bouchon or a
-ramequin has the size the cook gives it, and the recipe's proportion lives in how
-many are asked for, so the count is multiplied in whole units: `une pincée de
-bicarbonate de soude` from 6 servings to 25 comes back as `4 pincées de
-bicarbonate de soude`, carrying a note. Nothing is ever
-converted into grams or spoons, where published equivalences span a fourfold
-range; an order of magnitude belongs in a note, never in the quantity.
+### `scale_ingredients`
 
-Ranges are read as one quantity: "2 à 3 gousses" doubled reads "4 à 6 gousses",
-with `amount` holding the lower bound and `amountMax` the upper one. Where both
-ends land on the same amount, the line states that amount once and says so.
+Applies the same arithmetic to any list of ingredient lines, with no request to
+the site, so it works on a recipe copied from a book or a family notebook.
 
-A line that writes an article where a digit would go is read as one of the
-measure that follows it: `un bouchon de rhum` scaled sixfold is
-`6 bouchons de rhum`, and the note says which word the figure came from. A noun
-sitting between the amount and the `de` that introduces what is measured names a
-container or a gesture, which is how a measure the vocabulary has never met is
-still read. An article before a bare countable thing, as in `un oignon`, leaves
-the line as published.
+| Argument        | Type                                       | Required   | What it does                               |
+| --------------- | ------------------------------------------ | ---------- | ------------------------------------------ |
+| `ingredients`   | array of 1 to 100 strings, up to 300 chars | yes        | The lines to rescale, in French.           |
+| `factor`        | number, above 0 and up to 100              | one of two | The multiplier to apply.                   |
+| `from_servings` | number, above 0 and up to 500              | one of two | How many servings the list is written for. |
+| `to_servings`   | number, above 0 and up to 500              | one of two | How many servings are wanted.              |
 
-Each ingredient also carries `adjusted`, which says whether rounding moved the
-number away from the exact product.
+Pass `factor`, or the `from_servings` and `to_servings` pair.
 
-A shrinking line keeps the smallest share still worth measuring: a knife takes an
-oignon to a quarter, a boîte or a sachet goes to a half, an oeuf stops at one.
-Under that floor the amount is clamped up and **the line stops holding its share
-of the recipe**. Half a sachet of
-baking powder against three pots of flour comes out four times too strong that
-way, so the ingredient and the response both say it happened rather than leaving
-you to find out in the oven.
+**In return:** the `factor` used, the rescaled `ingredients` in the shape
+`get_recipe` returns, and `scaled_count`, `rounded_count` and `unscaled_count`,
+which count the lines whose value the rounding moved.
 
-`scale_ingredients` exposes the same logic **without any network request**, so it
-also works on a recipe pasted from somewhere else.
+## Scaling the quantities
 
-### Other things worth knowing
+Every ingredient comes back with a `scaling` flag saying what the rescaling could
+do with its quantity.
 
-**Marmiton is French.** Queries work best in French: `tarte aux pommes`,
-`poulet curry coco`.
+| Flag       | Meaning                                          | Example                                  |
+| ---------- | ------------------------------------------------ | ---------------------------------------- |
+| `scaled`   | The value is the product itself.                 | `3 oeufs` ×2 → `6 oeufs`                 |
+| `rounded`  | The value was moved to stay usable.              | `25 cl de lait` ×0.667 → `17 cl de lait` |
+| `unscaled` | Carries no quantity, so left exactly as written. | `sel`, `coriandre`                       |
 
-**One page of results.** Marmiton's robots.txt disallows paginating search
-results, so this server does not, and there is no page parameter. Narrow the query
-instead.
+A quantity is stated in the unit that suits it, so a line can come back in a
+different unit from the one the recipe used: 200 g multiplied by twenty reads
+`4 kg`.
 
-**Nutrition is not rescaled.** The figures Marmiton publishes describe the recipe
-as written, and they are returned as such.
-
-**Structured data, not scraping.** Everything is read from the `schema.org`
-JSON-LD that Marmiton publishes for machines, so there are no CSS selectors to
-break when the site is redesigned.
+How finely an ingredient can be divided depends on what it is. A baguette can be
+cut in two, in three or in four; an egg cannot be shared out. A quantity landing
+between the two is rounded, and the rescaled recipe then departs a little from
+the proportions of the original. The line carries `rounded`, and its `note` says
+what was done.
 
 ## Configuration
 
-Every variable is optional. Set them in the `env` block of your MCP client config.
+Every variable is optional. Set them in the `env` block of your client config.
 
-| Variable                     | Default                                | Purpose                                                        |
-| ---------------------------- | -------------------------------------- | -------------------------------------------------------------- |
-| `MARMITON_USER_AGENT`        | `mcp-marmiton v<version> (<repo url>)` | User-Agent sent to Marmiton.                                   |
-| `MARMITON_MIN_INTERVAL_MS`   | `1000`                                 | Minimum gap between requests. Values below 500 ms are ignored. |
-| `MARMITON_TIMEOUT_MS`        | `15000`                                | Per-request timeout.                                           |
-| `MARMITON_MAX_RETRIES`       | `3`                                    | Retries on rate limiting and transient errors.                 |
-| `MARMITON_CACHE_TTL_MS`      | `900000`                               | In-memory cache lifetime (15 minutes).                         |
-| `MARMITON_CACHE_MAX_ENTRIES` | `200`                                  | In-memory cache size.                                          |
-| `MARMITON_LOG_LEVEL`         | `error`                                | `silent`, `error`, `info` or `debug`. Logs go to stderr.       |
+| Variable                     | Default              | What it does                                                                                        |
+| ---------------------------- | -------------------- | --------------------------------------------------------------------------------------------------- |
+| `MARMITON_USER_AGENT`        | the project identity | Names your application to Marmiton, with an address where a person can be reached.                  |
+| `MARMITON_MIN_INTERVAL_MS`   | `1000`               | Gap between two requests, from 500 to 60000. A figure under the floor is refused and this one used. |
+| `MARMITON_TIMEOUT_MS`        | `15000`              | Deadline for one request, from 1000 to 120000.                                                      |
+| `MARMITON_MAX_RETRIES`       | `3`                  | Attempts after a transient failure, from 0 to 10.                                                   |
+| `MARMITON_CACHE_TTL_MS`      | `900000`             | How long a page stays in memory, from 0 to 86400000.                                                |
+| `MARMITON_CACHE_MAX_ENTRIES` | `200`                | Pages held in memory at once, from 0 to 10000.                                                      |
+| `MARMITON_LOG_LEVEL`         | `error`              | `silent`, `error`, `info` or `debug`, written to stderr.                                            |
 
-## Troubleshooting
+A value outside its range falls back to the default, and the reason is written to
+stderr.
 
-**`rate_limited` errors.** Marmiton is throttling this client. The server already
-retries with backoff and slows itself down. Wait a moment and try again, and raise
-`MARMITON_MIN_INTERVAL_MS` if it persists. This never means the recipe is missing.
+## Errors
 
-**`parse_failure` errors.** Marmiton changed how it publishes its structured data
-and the server could not read the response. Please
-[open an issue](https://github.com/smeet666/mcp-marmiton/issues) with the recipe
-you asked for. The server reports this loudly rather than pretending it found
-nothing.
+Every failure carries one of six codes, a message, and where it helps a hint
+naming the next move.
+
+| Code            | What happened                                           | What to do                                                                                                   |
+| --------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `not_found`     | Marmiton answered, and holds no such recipe.            | Check the id with `search_recipes`.                                                                          |
+| `invalid_input` | The arguments were refused before any request went out. | Read the message, which names the argument.                                                                  |
+| `rate_limited`  | Marmiton asked this client to slow down.                | Wait the number of seconds the hint names and call again with the same arguments. The recipe is still there. |
+| `parse_failure` | The page loaded and the expected content was absent.    | Report it at [the issue tracker](https://github.com/smeet666/mcp-marmiton/issues).                           |
+| `network_error` | The request did not complete.                           | Try again shortly.                                                                                           |
+| `timeout`       | The request passed its deadline.                        | Raise `MARMITON_TIMEOUT_MS`.                                                                                 |
+
+## As a library
+
+The layer reading Marmiton is published on its own, with its pacing, its cache
+and its errors, and with no protocol attached.
+
+```ts
+import { MarmitonClient } from "mcp-marmiton/client";
+
+const client = new MarmitonClient();
+const { data, cached } = await client.getRecipe({ id: "18257" });
+console.log(data.title, data.ingredients.length, cached);
+```
+
+`search` and `getRecipe` each answer `{ data, cached }`, and throw an error
+carrying one of the six codes. The floor between two requests holds here as well.
+
+## Pacing and attribution
+
+Requests go out one at a time with a minimum gap between them, and that floor
+holds however the server is configured. The `User-Agent` always ends with the
+project identity and an address where a person can be reached. Everything is read
+from the `schema.org` JSON-LD Marmiton publishes for machines, and the paths its
+robots.txt disallows are left alone.
+
+Every result carries the title and the address of the recipe, and `get_recipe`
+carries the author when the page names one, along with `attribution`, the title
+and the address written as one line.
+
+The recipes belong to Marmiton and to the cooks who wrote them. This MCP server
+is an unofficial project, with no affiliation to Marmiton.
+
+## Privacy
+
+This server collects nothing about you and sends nothing to its author. It runs
+on your machine, contacts `www.marmiton.org` and nothing else, holds its answers in memory
+while it runs, and writes nothing to disk.
+[PRIVACY.md](PRIVACY.md) states what a request carries and which settings change
+any of it.
 
 ## Development
 
 ```bash
 npm install
-npm run build:fixtures   # regenerate the HTML test fixtures
-npm test                 # unit tests, no network
-npm run typecheck
-npm run build
-MARMITON_LIVE=1 npm run test:live   # hits the real site, excluded from CI
-npm run inspector        # explore the tools in the MCP Inspector
+npm run build:fixtures
+npm test
+npm run check
 ```
 
-Fixtures are generated, not captured: they reproduce Marmiton's JSON-LD shape with
-invented recipes, so the tests are deterministic and no Marmiton content lives in
-this repository.
-
-The scraping layer (`src/marmiton`, `src/recipe`) does not import the MCP SDK and
-is published separately as `mcp-marmiton/client`, so it can be used as a plain
-library.
-
-## Recipes, copyright and cooking
-
-Ingredient lists and cooking steps are facts and procedures. The descriptive prose
-an author writes around them is their work, and this server does not return it:
-you get what you need to cook, plus a link to the original page.
-
-This server is a client. It reads the structured data Marmiton publishes for
-machines, on demand, one request at a time, in response to an explicit request
-from you or your assistant. It does not crawl the site, does not build a recipe
-database, and writes nothing to disk. It honours Marmiton's robots.txt, including
-the rule against paginating search results.
-
-Every result carries the recipe title and its source URL. If you display or reuse
-anything this server returns, keep that attribution and link back to Marmiton.
-
-Rescaled quantities are computed, and cooking is not arithmetic: baking in
-particular does not always scale linearly. Read them as a helpful starting point
-and use your judgement.
-
-This is an unofficial project, with no affiliation to or endorsement by Marmiton.
+Tests run against generated fixtures and make no network request. The live suite,
+`npm run test:live`, makes one request per route and runs nightly against the
+site itself.
 
 ## Contributing
 
-Bugs, questions and ideas all belong in
-[the issue tracker](https://github.com/smeet666/mcp-marmiton/issues). Pull requests
-are welcome; please open an issue first so we can agree on what the right
-answer is before you write it. [CONTRIBUTING.md](CONTRIBUTING.md) has the
-detail, and [SECURITY.md](SECURITY.md) covers anything exploitable.
-
-## Support
-
-These servers are free and stay free. If one of them saved you an afternoon,
-you can [buy me a coffee](https://buymeacoffee.com/smeet666).
+Bugs, questions and ideas belong in
+[the issue tracker](https://github.com/smeet666/mcp-marmiton/issues). Pull
+requests are welcome; opening an issue first helps agree on the shape of the
+change. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT. See [LICENSE](./LICENSE). The license covers this source code only, not the
-recipes retrieved through it.
+MIT, see [LICENSE](LICENSE). The recipes belong to Marmiton and to their authors.
 
 ---
 
@@ -274,11 +281,21 @@ recipes retrieved through it.
 
 # mcp-marmiton (français)
 
-Un serveur [MCP](https://modelcontextprotocol.io) pour [Marmiton](https://www.marmiton.org).
-Cherchez des recettes, lisez leurs ingrédients et leurs étapes, et **adaptez les
-quantités au nombre de convives**. **Sans clé d'API, sans compte, sans configuration.**
+_[English version](#mcp-marmiton)_
 
-## Démarrage rapide
+[Marmiton](https://www.marmiton.org) est le plus grand site de cuisine français,
+où des cuisiniers publient leurs recettes depuis 1999. Chacune donne ses
+ingrédients avec leurs quantités, les étapes à suivre, les temps de préparation
+et de cuisson, le nombre de parts pour lequel elle est écrite, et les notes
+laissées par ceux qui l'ont faite.
+
+Ce serveur relie un client de conversation à ce site. On peut y chercher des
+recettes par plat ou par ingrédient, en lire une en entier avec ses ingrédients
+et ses étapes, et **adapter les quantités au nombre de convives**, chaque ligne
+disant si le chiffre est exact ou s'il a été déplacé pour rester utilisable en
+cuisine. Aucune clé d'API, aucun compte.
+
+## Installation
 
 **Installation en un clic**
 
@@ -291,7 +308,7 @@ quantités au nombre de convives**. **Sans clé d'API, sans compte, sans configu
 claude mcp add marmiton -- npx -y mcp-marmiton
 ```
 
-**Claude Desktop, Cursor, et tout client utilisant le format standard**
+**Claude Desktop, Cursor, et tout client au format de configuration standard**
 
 ```json
 {
@@ -303,6 +320,9 @@ claude mcp add marmiton -- npx -y mcp-marmiton
   }
 }
 ```
+
+Node 24 ou plus récent est nécessaire, et aucune variable d'environnement n'est à
+renseigner.
 
 ### Avec Docker
 
@@ -317,190 +337,213 @@ claude mcp add marmiton -- npx -y mcp-marmiton
 }
 ```
 
-`-i` garde l'entrée standard ouverte, qui est le canal du protocole, et aucun
-`-t` n'est passé : un terminal réécrit le flux et le casse. Le conteneur a besoin
-d'un accès HTTPS sortant vers `www.marmiton.org`, et de rien d'autre :
-aucun volume, aucun port, aucune variable d'environnement, aucun identifiant.
+`-i` garde l'entrée standard ouverte, qui est le canal du protocole, et `-t` est
+omis parce qu'un TTY réécrit le flux. Le conteneur a besoin d'un accès HTTPS
+sortant vers `www.marmiton.org`, et de rien d'autre : aucun volume, aucun port,
+aucun identifiant.
 
-**Bundle, sans npm**
+### Bundle, sans npm
 
-Téléchargez `mcp-marmiton-<version>.mcpb` depuis
-[la dernière release](https://github.com/smeet666/mcp-marmiton/releases/latest) et
-ouvrez-le. Un client compatible avec les bundles MCP l'installe seul, sans npm
-ni fichier de configuration à modifier. Le bundle embarque ses dépendances,
-donc rien n'est téléchargé à l'installation.
+Téléchargez `mcp-marmiton-2.0.0.mcpb` depuis
+[la dernière publication](https://github.com/smeet666/mcp-marmiton/releases/latest)
+et ouvrez-le. Un client qui gère les bundles MCP l'installe seul, sans npm et
+sans fichier de configuration à modifier. Le bundle emporte ses dépendances, donc
+rien n'est téléchargé à l'installation.
 
-## Outils
+## Ce qu'on peut demander
 
-| Outil               | Rôle                                        | Paramètres principaux                                   |
-| ------------------- | ------------------------------------------- | ------------------------------------------------------- |
-| `search_recipes`    | Trouve des recettes par plat ou ingrédient. | `query`, `limit`                                        |
-| `get_recipe`        | Lit une recette, avec adaptation possible.  | `id`, `url`, `servings`                                 |
-| `scale_ingredients` | Adapte n'importe quelle liste, hors ligne.  | `ingredients`, `factor`, `from_servings`, `to_servings` |
+- « Trouve-moi une recette de tarte aux pommes. »
+- « Lis-moi cette recette pour six personnes au lieu de quatre. »
+- « Qu'est-ce que je peux faire avec des courgettes et du chèvre ? »
+- « Voici une recette recopiée d'un livre, multiplie-la par 1,5. »
+- « Combien de temps de cuisson pour la deuxième ? »
 
-La recherche renvoie un `id` Marmiton pour chaque résultat, et `get_recipe` prend
-cet id. C'est l'enchaînement prévu : chercher, puis lire.
+Marmiton est un site français, donc ses recettes se trouvent en français : `tarte
+aux pommes`, `poulet curry coco`. Le chemin ordinaire va d'une recherche à une
+lecture : `search_recipes` nomme un `id`, et `get_recipe` reprend cet
+identifiant.
 
-Le serveur est en **lecture seule**. Il ne publie jamais rien sur Marmiton.
+## Les outils
 
-### L'adaptation des quantités est le cœur du sujet
+| Outil               | Ce qu'il fait                                                      |
+| ------------------- | ------------------------------------------------------------------ |
+| `search_recipes`    | Trouve des recettes par plat ou par ingrédient.                    |
+| `get_recipe`        | Lit une recette, adaptée à un nombre de parts sur demande.         |
+| `scale_ingredients` | Adapte n'importe quelle liste d'ingrédients, sans requête au site. |
 
-Demander à un modèle de diviser une recette par 1,5 produit volontiers « 2,4 œufs »
-et « 0,67 pincée de sel », énoncés avec le même aplomb qu'un chiffre juste. Ce
-serveur fait le calcul lui-même et, surtout, **signale ce qu'il n'a pas pu
-calculer**. Chaque ingrédient porte un indicateur `scaling` :
+Le serveur ne fait que lire. Il ne publie rien sur Marmiton.
 
-| Indicateur | Sens                                                 | Exemple                                  |
-| ---------- | ---------------------------------------------------- | ---------------------------------------- |
-| `scaled`   | La valeur est le produit exact.                      | `3 oeufs` ×2 → `6 oeufs`                 |
-| `rounded`  | La valeur a dû être déplacée pour rester utilisable. | `25 cl de lait` ×0,667 → `17 cl de lait` |
-| `unscaled` | Ne porte aucune quantité, laissé tel que publié.     | `sel`, `coriandre`                       |
+### `search_recipes`
 
-Un décompte tombe juste aussi bien qu'une masse : une pincée multipliée par six
-fait six pincées, et cette ligne est `scaled`. `rounded` désigne une valeur posée
-ailleurs que là où le calcul la mettait, un demi-œuf ramené à un œuf entier ou
-133,4 g écrits 135 g.
+Cherche des recettes par plat ou par ingrédient. Marmiton fait correspondre les
+premières lettres d'un mot, donc une requête ramène ce que le site a classé pour
+elle, et la réponse signale quand les titres ne portent aucun des mots demandés.
 
-Deux règles sont garanties. Réduire une recette **ne demande jamais davantage** que
-l'originale : un demi-sachet au facteur 0,667 reste un demi-sachet, jamais un
-sachet entier. Et l'adaptation ne **supprime jamais** un ingrédient en l'arrondissant
-à zéro, d'où les fractions pour les petites quantités.
+| Argument | Type                           | Requis | Ce qu'il fait                                     |
+| -------- | ------------------------------ | ------ | ------------------------------------------------- |
+| `query`  | chaîne, jusqu'à 200 caractères | oui    | Ce qu'on cherche, en français.                    |
+| `limit`  | entier, 1 à 30, défaut `10`    | non    | Recettes à servir depuis cette page de résultats. |
 
-**Un dénombrable se divise selon son contenu, pas selon son emballage.** Une boîte
-de tomates se verse et le reste se garde, un sachet de sucre vanillé se partage à
-l'œil, une feuille de gélatine se coupe aux ciseaux, une branche de thym se casse
-en deux : tous tombent sur une demie. Un demi-œuf, lui,
-demanderait de le battre et de le peser, ce qu'aucune recette ne demande : un
-nombre d'œufs, de jaunes ou de blancs d'œufs tombe sur un entier. Quelques cas se
-décident sur la nature de la chose : un clou de girofle et un zeste se comptent
-entiers, un pot et une bouteille en contiennent assez pour qu'un quart soit une
-portion, une tranche est déjà taillée dans plus grand et la planche lui reprend
-un coin du même geste, une gousse d'ail se coupe en deux et pas plus fin, un
-blanc de poulet est une viande et
-se coupe en deux, et une douzaine
-énonce un nombre de choses plutôt qu'une mesure, si bien que
-« 2 douzaines d'escargots » réduites d'un quart reviennent en « 18 escargots ».
+**En retour :** des lignes portant `id`, que `get_recipe` reprend ; `title` ;
+`url` ; et `image_url`, `null` pour une recette publiée sans photo. Viennent
+aussi `result_count` et `total_available`, les recettes de cette page avant
+l'application de `limit`. Le robots.txt de Marmiton interdit de paginer les
+résultats de recherche, donc une recherche lit une page : resserrez la requête
+pour voir d'autres recettes.
 
-Les mesures approximatives sont des quantités elles aussi. Une pincée, une
-poignée, un bouchon ou un ramequin ont la taille que le cuisinier leur donne,
-et la proportion de la recette tient au nombre demandé : ce nombre est donc
-multiplié, en unités entières. « une pincée de bicarbonate de soude » de 6 à 25
-parts revient en « 4 pincées de bicarbonate de soude », accompagnée d'une
-note. Aucune conversion en grammes ni en cuillères : les
-équivalences publiées varient du simple au quadruple, et un ordre de grandeur a
-sa place dans une note, jamais dans la quantité.
+### `get_recipe`
 
-Les fourchettes sont lues comme une seule quantité : « 2 à 3 gousses » doublé
-donne « 4 à 6 gousses », `amount` portant la borne basse et `amountMax` la borne
-haute. Quand les deux bornes tombent sur la même valeur, la ligne énonce cette
-valeur une fois et le signale.
+Lit une recette en entier, et adapte ses quantités quand un nombre de parts est
+donné.
 
-Une ligne qui écrit un article là où irait un chiffre est lue comme une unité de
-la mesure qui suit : « un bouchon de rhum » multiplié par six donne « 6 bouchons
-de rhum », et la note indique de quel mot vient le chiffre. Un nom placé entre la
-quantité et le « de » qui introduit ce qui est mesuré désigne un contenant ou un
-geste, ce qui permet de lire une mesure absente du vocabulaire. Un article devant
-une chose dénombrable seule, comme « un oignon », laisse la ligne telle que
-publiée.
+| Argument   | Type                             | Requis        | Ce qu'il fait                                      |
+| ---------- | -------------------------------- | ------------- | -------------------------------------------------- |
+| `id`       | chaîne de chiffres               | l'un des deux | L'identifiant Marmiton rendu par `search_recipes`. |
+| `url`      | une adresse marmiton.org         | l'un des deux | L'adresse de la recette, utilisée à défaut d'`id`. |
+| `servings` | nombre, au-delà de 0 jusqu'à 500 | non           | Adapte les quantités à ce nombre de parts.         |
 
-Chaque ingrédient porte aussi `adjusted`, qui dit si l'arrondi a déplacé le
-nombre par rapport au produit exact.
+**En retour :** `title`, `url`, `ingredients`, `steps`, `prep_minutes`,
+`cook_minutes`, `total_minutes`, `category`, `author`, `rating` et `nutrition`,
+chacun `null` quand la page n'en publie pas. `yield` dit pour quoi la recette est
+écrite et vers quoi elle a été adaptée : `original_count`, `original_text`,
+`requested`, `unit` pour ce qui est compté, et `factor` pour le multiplicateur
+appliqué. Chaque ingrédient porte `original`, `text`, `amount`, `amountMax` pour
+un intervalle, `unit`, et `scaling`, qui vaut `scaled`, `rounded` ou `unscaled`.
+Les chiffres sont l'arithmétique de ce serveur, donc dites qu'ils ont été
+recalculés quand vous les montrez. `nutrition` décrit la recette telle que
+publiée, pour son propre nombre de parts.
 
-Une ligne qui rétrécit garde la plus petite part qui vaille encore la peine : le
-couteau mène un oignon au quart, une boîte ou un sachet s'arrêtent à la demie, un
-œuf s'arrête à l'unité. Sous ce plancher, la quantité est remontée et **la ligne
-cesse de tenir sa part de la recette**. Un demi-sachet
-de levure face à trois pots de farine ressort ainsi quatre fois trop dosé, donc
-l'ingrédient et la réponse le disent, plutôt que de vous le laisser découvrir au
-four.
+### `scale_ingredients`
 
-`scale_ingredients` expose la même logique **sans aucune requête réseau**, ce qui
-permet aussi d'adapter une recette venue d'ailleurs.
+Applique la même arithmétique à n'importe quelle liste d'ingrédients, sans
+requête au site, donc sur une recette recopiée d'un livre ou d'un carnet de
+famille.
 
-### Autres points utiles
+| Argument        | Type                                               | Requis        | Ce qu'il fait                                       |
+| --------------- | -------------------------------------------------- | ------------- | --------------------------------------------------- |
+| `ingredients`   | tableau de 1 à 100 chaînes, jusqu'à 300 caractères | oui           | Les lignes à adapter, en français.                  |
+| `factor`        | nombre, au-delà de 0 jusqu'à 100                   | l'un des deux | Le multiplicateur à appliquer.                      |
+| `from_servings` | nombre, au-delà de 0 jusqu'à 500                   | l'un des deux | Le nombre de parts pour lequel la liste est écrite. |
+| `to_servings`   | nombre, au-delà de 0 jusqu'à 500                   | l'un des deux | Le nombre de parts voulu.                           |
 
-**Marmiton est un site français.** Les requêtes fonctionnent mieux en français :
-`tarte aux pommes`, `poulet curry coco`.
+Passez `factor`, ou le couple `from_servings` et `to_servings`.
 
-**Une seule page de résultats.** Le robots.txt de Marmiton interdit de paginer les
-résultats de recherche, donc ce serveur ne le fait pas et n'expose aucun paramètre
-de page. Affinez plutôt la requête.
+**En retour :** le `factor` employé, les `ingredients` adaptés dans la forme que
+rend `get_recipe`, et `scaled_count`, `rounded_count` et `unscaled_count`, qui
+comptent les lignes dont l'arrondi a déplacé la valeur.
 
-**La nutrition n'est pas recalculée.** Les valeurs publiées par Marmiton décrivent
-la recette telle quelle, et sont restituées comme telles.
+## L'adaptation des quantités
 
-**Données structurées, pas de scraping.** Tout est lu dans le JSON-LD `schema.org`
-que Marmiton publie à destination des machines, donc aucun sélecteur CSS ne peut
-casser lors d'une refonte du site.
+Chaque ingrédient revient avec un drapeau `scaling` qui dit ce que l'adaptation a
+pu faire de sa quantité.
+
+| Drapeau    | Ce que cela veut dire                            | Exemple                                  |
+| ---------- | ------------------------------------------------ | ---------------------------------------- |
+| `scaled`   | La valeur est le produit lui-même.               | `3 oeufs` ×2 → `6 oeufs`                 |
+| `rounded`  | La valeur a été déplacée pour rester utilisable. | `25 cl de lait` ×0,667 → `17 cl de lait` |
+| `unscaled` | Ne porte aucune quantité, laissée telle quelle.  | `sel`, `coriandre`                       |
+
+Une quantité est exprimée dans l'unité qui lui convient. Après adaptation, une
+ligne peut donc apparaître dans une autre unité que celle de la recette : 200 g
+multipliés par vingt donnent `4 kg`.
+
+La finesse à laquelle un ingrédient se coupe dépend de sa nature. Une baguette se
+coupe en deux, en trois ou en quatre ; un oeuf ne se partage pas. Une quantité
+qui tombe entre les deux est donc arrondie, et la recette adaptée s'écarte alors
+un peu des proportions de l'originale. La ligne porte `rounded`, et sa `note` dit
+ce qui a été fait.
 
 ## Configuration
 
-Toutes les variables sont optionnelles, à déclarer dans le bloc `env` de votre client.
+Chaque variable est facultative. Elles se posent dans le bloc `env` de la
+configuration du client.
 
-| Variable                     | Défaut                                     | Rôle                                                              |
-| ---------------------------- | ------------------------------------------ | ----------------------------------------------------------------- |
-| `MARMITON_USER_AGENT`        | `mcp-marmiton v<version> (<url du dépôt>)` | User-Agent envoyé à Marmiton.                                     |
-| `MARMITON_MIN_INTERVAL_MS`   | `1000`                                     | Écart minimal entre requêtes. Sous 500 ms, la valeur est ignorée. |
-| `MARMITON_TIMEOUT_MS`        | `15000`                                    | Délai d'attente par requête.                                      |
-| `MARMITON_MAX_RETRIES`       | `3`                                        | Tentatives en cas de limitation ou d'erreur passagère.            |
-| `MARMITON_CACHE_TTL_MS`      | `900000`                                   | Durée de vie du cache mémoire (15 minutes).                       |
-| `MARMITON_CACHE_MAX_ENTRIES` | `200`                                      | Taille du cache mémoire.                                          |
-| `MARMITON_LOG_LEVEL`         | `error`                                    | `silent`, `error`, `info` ou `debug`. Logs sur stderr.            |
+| Variable                     | Défaut               | Ce qu'elle fait                                                                                           |
+| ---------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------- |
+| `MARMITON_USER_AGENT`        | l'identité du projet | Nomme votre application auprès de Marmiton, avec une adresse où joindre une personne.                     |
+| `MARMITON_MIN_INTERVAL_MS`   | `1000`               | Écart entre deux requêtes, de 500 à 60000. Une valeur sous le plancher est refusée au profit de celle-ci. |
+| `MARMITON_TIMEOUT_MS`        | `15000`              | Délai d'une requête, de 1000 à 120000.                                                                    |
+| `MARMITON_MAX_RETRIES`       | `3`                  | Tentatives après un échec passager, de 0 à 10.                                                            |
+| `MARMITON_CACHE_TTL_MS`      | `900000`             | Durée pendant laquelle une page reste en mémoire, de 0 à 86400000.                                        |
+| `MARMITON_CACHE_MAX_ENTRIES` | `200`                | Pages gardées en mémoire à la fois, de 0 à 10000.                                                         |
+| `MARMITON_LOG_LEVEL`         | `error`              | `silent`, `error`, `info` ou `debug`, écrit sur la sortie d'erreur.                                       |
 
-## Dépannage
+Une valeur hors de sa plage retombe sur le défaut, et la raison est écrite sur la
+sortie d'erreur.
 
-**Erreurs `rate_limited`.** Marmiton limite ce client. Le serveur réessaie déjà avec
-backoff et ralentit tout seul. Patientez un instant, et augmentez
-`MARMITON_MIN_INTERVAL_MS` si cela persiste. Cela ne signifie jamais que la recette
-est absente.
+## Erreurs
 
-**Erreurs `parse_failure`.** Marmiton a changé la façon dont il publie ses données
-structurées et le serveur n'a pas su lire la réponse. Merci d'[ouvrir une issue](https://github.com/smeet666/mcp-marmiton/issues)
-en indiquant la recette demandée. Le serveur signale ce cas au lieu de faire comme
-s'il n'avait rien trouvé.
+Chaque échec porte un des six codes, un message, et quand cela aide une
+indication du geste suivant.
+
+| Code            | Ce qui s'est passé                                 | Que faire                                                                                         |
+| --------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `not_found`     | Marmiton a répondu, et n'a pas cette recette.      | Vérifiez l'identifiant avec `search_recipes`.                                                     |
+| `invalid_input` | Les arguments ont été refusés avant toute requête. | Lisez le message, qui nomme l'argument.                                                           |
+| `rate_limited`  | Marmiton demande à ce client de ralentir.          | Attendez les secondes indiquées et rappelez avec les mêmes arguments. La recette est toujours là. |
+| `parse_failure` | La page a chargé et le contenu attendu est absent. | Signalez-le sur [le suivi d'incidents](https://github.com/smeet666/mcp-marmiton/issues).          |
+| `network_error` | La requête n'a pas abouti.                         | Réessayez sous peu.                                                                               |
+| `timeout`       | La requête a dépassé son délai.                    | Augmentez `MARMITON_TIMEOUT_MS`.                                                                  |
+
+## Comme bibliothèque
+
+La couche qui lit Marmiton est publiée seule, avec son rythme, son cache et ses
+erreurs, sans protocole attaché.
+
+```ts
+import { MarmitonClient } from "mcp-marmiton/client";
+
+const client = new MarmitonClient();
+const { data, cached } = await client.getRecipe({ id: "18257" });
+console.log(data.title, data.ingredients.length, cached);
+```
+
+`search` et `getRecipe` répondent chacun `{ data, cached }`, et lèvent une erreur
+portant un des six codes. Le plancher entre deux requêtes tient également ici.
+
+## Rythme et attribution
+
+Les requêtes partent une à une avec un écart minimal entre elles, et ce plancher
+tient quelle que soit la configuration. Le `User-Agent` se termine toujours par
+l'identité du projet et une adresse où joindre une personne. Tout est lu dans le
+JSON-LD `schema.org` que Marmiton publie pour les machines, et les chemins que
+son robots.txt interdit sont laissés tranquilles.
+
+Chaque résultat porte le titre et l'adresse de la recette, et `get_recipe` porte
+l'auteur quand la page le nomme, ainsi qu'`attribution`, le titre et l'adresse
+écrits en une ligne.
+
+Les recettes appartiennent à Marmiton et aux cuisiniers qui les ont écrites.
+Ce MCP est un projet non officiel, sans affiliation à Marmiton.
+
+## Confidentialité
+
+Ce serveur ne collecte rien sur vous et n'envoie rien à son auteur. Il tourne sur
+votre machine, ne joint que `www.marmiton.org`, garde ses réponses en mémoire le temps qu'il
+tourne, et n'écrit rien sur le disque. [PRIVACY.md](PRIVACY.md) dit ce qu'une
+requête emporte et quels réglages changent cela.
 
 ## Développement
 
 ```bash
 npm install
-npm run build:fixtures   # régénère les fixtures HTML de test
-npm test                 # tests unitaires, sans réseau
-npm run typecheck
-npm run build
-MARMITON_LIVE=1 npm run test:live   # touche le vrai site, exclu de la CI
-npm run inspector        # explorer les outils dans le MCP Inspector
+npm run build:fixtures
+npm test
+npm run check
 ```
 
-Les fixtures sont générées, pas capturées : elles reproduisent la forme du JSON-LD
-de Marmiton avec des recettes inventées, ce qui rend les tests déterministes et
-évite de stocker du contenu Marmiton dans ce dépôt.
+Les tests s'exécutent sur des fixtures engendrées et n'émettent aucune requête.
+La suite en direct, `npm run test:live`, émet une requête par route et tourne
+chaque nuit contre le site lui-même.
 
-La couche d'accès (`src/marmiton`, `src/recipe`) n'importe pas le SDK MCP et est
-publiée séparément sous `mcp-marmiton/client`, utilisable comme simple bibliothèque.
+## Contribuer
 
-## Recettes, droits d'auteur et cuisine
-
-Les listes d'ingrédients et les étapes de préparation sont des faits et des procédés.
-La prose descriptive qu'un auteur rédige autour relève de sa création, et ce serveur
-ne la renvoie pas : vous obtenez de quoi cuisiner, plus un lien vers la page d'origine.
-
-Ce serveur est un client. Il lit les données structurées que Marmiton publie pour
-les machines, à la demande, une requête à la fois, en réponse à une demande explicite
-de votre part ou de celle de votre assistant. Il ne parcourt pas le site, ne constitue
-aucune base de recettes et n'écrit rien sur le disque. Il respecte le robots.txt de
-Marmiton, y compris l'interdiction de paginer les résultats de recherche.
-
-Chaque résultat porte le titre de la recette et son URL source. Si vous affichez ou
-réutilisez ce que renvoie ce serveur, conservez cette attribution et le lien vers
-Marmiton.
-
-Les quantités adaptées sont calculées, et la cuisine n'est pas de l'arithmétique :
-la pâtisserie en particulier ne se met pas toujours à l'échelle linéairement.
-Prenez-les comme un point de départ commode et gardez votre jugement.
-
-Projet non officiel, sans affiliation à Marmiton ni approbation de sa part.
+Les anomalies, les questions et les idées ont leur place dans
+[le suivi d'incidents](https://github.com/smeet666/mcp-marmiton/issues). Les
+propositions de modification sont bienvenues ; ouvrir un ticket d'abord aide à
+s'accorder sur la forme du changement. Voir [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
 
-MIT, voir [LICENSE](./LICENSE). La licence couvre uniquement le code source, pas les
-recettes récupérées par son intermédiaire.
+MIT, voir [LICENSE](LICENSE). Les recettes appartiennent à Marmiton et à leurs
+auteurs.
