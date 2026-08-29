@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "mcp-marmiton",
   "display_name": "Marmiton",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "MCP server for Marmiton. Search recipes, read ingredients and steps, and scale quantities to any number of servings. No API key required.",
   "long_description": "Search French recipes, read ingredients and steps, and rescale quantities to any number of servings. No API key, no account.",
   "author": {
