@@ -41,94 +41,15 @@
   "tools": [
     {
       "name": "search_recipes",
-      "description": "Find recipes by dish or ingredient.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string",
-            "maxLength": 200,
-            "description": "What to search for, in French, for example 'tarte aux pommes'."
-          },
-          "limit": {
-            "default": 10,
-            "description": "Maximum recipes to return from this page of results.",
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 30
-          }
-        },
-        "required": ["query"],
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "additionalProperties": false
-      }
+      "description": "Find recipes by dish or ingredient."
     },
     {
       "name": "get_recipe",
-      "description": "Read one recipe, optionally rescaled to a number of servings.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "description": "Marmiton recipe id, as returned by search_recipes. Preferred over 'url'.",
-            "type": "string",
-            "pattern": "^\\d+$"
-          },
-          "url": {
-            "description": "Full marmiton.org recipe URL. Only marmiton.org is accepted. Ignored when 'id' is given.",
-            "type": "string",
-            "format": "uri"
-          },
-          "servings": {
-            "description": "Rescale the ingredients to this many servings. Omit to get the recipe exactly as published.",
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "maximum": 500
-          }
-        },
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "additionalProperties": false
-      }
+      "description": "Read one recipe, optionally rescaled to a number of servings."
     },
     {
       "name": "scale_ingredients",
-      "description": "Rescale any ingredient list, without contacting any website.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "ingredients": {
-            "minItems": 1,
-            "maxItems": 100,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "maxLength": 300
-            },
-            "description": "Ingredient lines, for example ['200 g de farine', '3 oeufs', 'sel']."
-          },
-          "factor": {
-            "description": "Multiplier to apply. Use this or the from/to pair.",
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "maximum": 100
-          },
-          "from_servings": {
-            "description": "How many servings the list is written for.",
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "maximum": 500
-          },
-          "to_servings": {
-            "description": "How many servings are wanted.",
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "maximum": 500
-          }
-        },
-        "required": ["ingredients"],
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "additionalProperties": false
-      }
+      "description": "Rescale any ingredient list, without contacting any website."
     }
   ],
   "compatibility": {
