@@ -1,0 +1,690 @@
+{
+  "author": "Damien Bouissou",
+  "authorUrl": "https://github.com/smeet666",
+  "description": "MCP server for Marmiton. Search recipes, read ingredients and steps, and scale quantities to any number of servings. No API key required.",
+  "homepage": "https://github.com/smeet666/mcp-marmiton#readme",
+  "identifier": "smeet666-mcp-marmiton",
+  "name": "mcp-marmiton",
+  "prompts": [],
+  "resources": [],
+  "tags": [
+    "mcp",
+    "modelcontextprotocol",
+    "model-context-protocol",
+    "mcp-server",
+    "marmiton",
+    "recipe",
+    "recipes",
+    "cooking",
+    "food",
+    "french",
+    "scaling",
+    "servings",
+    "claude",
+    "cursor",
+    "llm",
+    "ai",
+    "no-api-key"
+  ],
+  "tools": [
+    {
+      "name": "search_recipes",
+      "title": "Search recipes",
+      "description": "Search Marmiton for recipes by free text: a dish, an ingredient, or both, for example 'tarte aux pommes' or 'poulet curry coco'. Marmiton is a French site, so French terms work best. Returns candidate recipes with the id and URL needed to read one with get_recipe. One call returns one page of results. Marmiton's robots.txt disallows paginating search results, so this server does not, and there is no page parameter: narrow the query instead of asking for more pages.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "What to search for, in French, for example 'tarte aux pommes'."
+          },
+          "limit": {
+            "default": 10,
+            "description": "Maximum recipes to return from this page of results.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          }
+        },
+        "required": ["query"],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Marmiton recipe id. Pass this to get_recipe."
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "image_url": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["id", "title", "url", "image_url"],
+              "additionalProperties": false
+            }
+          },
+          "result_count": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "total_available": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Recipes on this page before applying 'limit'."
+          },
+          "source": {
+            "type": "string",
+            "const": "marmiton.org"
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["query", "results", "result_count", "total_available", "source", "notes"],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "get_recipe",
+      "title": "Get a recipe",
+      "description": "Read one Marmiton recipe: ingredients, steps, times, category, rating and nutrition. Give the id returned by search_recipes, or a marmiton.org recipe URL. Set 'servings' to rescale the quantities. Each ingredient reports how it was handled: 'scaled' when the arithmetic came out exact, which a count of eggs, spoons or pinches reaches as readily as a mass in grams, 'rounded' when the value had to be moved to stay usable, and 'unscaled' for lines carrying no quantity at all. Trust that flag rather than recomputing: the point of scaling here is to avoid answers like '2.4 eggs'. Recipes yielding pieces rather than servings are rescaled the same way; check 'yield' to see which. Always cite 'attribution' when showing a recipe to a user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "Marmiton recipe id, as returned by search_recipes. Preferred over 'url'.",
+            "type": "string",
+            "pattern": "^\\d+$"
+          },
+          "url": {
+            "description": "Full marmiton.org recipe URL. Only marmiton.org is accepted. Ignored when 'id' is given.",
+            "type": "string",
+            "format": "uri"
+          },
+          "servings": {
+            "description": "Rescale the ingredients to this many servings. Omit to get the recipe exactly as published.",
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 500
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "yield": {
+            "type": "object",
+            "properties": {
+              "original_count": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "original_text": {
+                "type": "string"
+              },
+              "requested": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "unit": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "What is being counted: 'personnes', 'pièces'."
+              },
+              "factor": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Multiplier applied to the quantities."
+              }
+            },
+            "required": ["original_count", "original_text", "requested", "unit", "factor"],
+            "additionalProperties": false
+          },
+          "ingredients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "original": {
+                  "type": "string",
+                  "description": "The ingredient line exactly as Marmiton publishes it."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The line after scaling, identical to 'original' when unscaled."
+                },
+                "amount": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The scaled quantity, expressed in 'unit'. Read the two together: a large result is moved to a bigger unit, so 200 g scaled tenfold reads as 2 kg, and the bare number shrinks while the quantity grows."
+                },
+                "amountMax": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Upper bound when the line gives a range, as in '200 à 300 g', with 'amount' holding the lower one. Null when the line states a single amount."
+                },
+                "unit": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The unit 'amount' is in, which may differ from the one the recipe used."
+                },
+                "scaling": {
+                  "type": "string",
+                  "enum": ["scaled", "rounded", "unscaled"],
+                  "description": "'scaled' means the arithmetic came out exact, which a count reaches as readily as a mass: one pincée multiplied by six is six pincées. 'rounded' means the value had to be moved to stay usable, to a whole or half unit or to a step a scale can show. 'unscaled' was left as published, because nothing on the line is the factor's to multiply: the note says which of the two it is."
+                },
+                "adjusted": {
+                  "type": "boolean",
+                  "description": "True when rounding moved the value away from the exact product, which is what makes a line 'rounded' rather than 'scaled'."
+                },
+                "note": {
+                  "description": "Why the line was rounded, clamped or left alone, including when the measure is approximate and only its count was multiplied.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "original",
+                "text",
+                "amount",
+                "amountMax",
+                "unit",
+                "scaling",
+                "adjusted"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "prep_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cook_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "number"
+                  },
+                  "count": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "best": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["value", "count", "best"],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nutrition": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "calories": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "protein": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "fat": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "carbohydrate": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "fiber": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "sodium": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "serving_size": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "calories",
+                  "protein",
+                  "fat",
+                  "carbohydrate",
+                  "fiber",
+                  "sodium",
+                  "serving_size"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nutrition is given for the recipe as published, not rescaled."
+          },
+          "attribution": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "const": "marmiton.org"
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "url",
+          "yield",
+          "ingredients",
+          "steps",
+          "prep_minutes",
+          "cook_minutes",
+          "total_minutes",
+          "category",
+          "author",
+          "rating",
+          "nutrition",
+          "attribution",
+          "source",
+          "notes"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "scale_ingredients",
+      "title": "Scale an ingredient list",
+      "description": "Rescale a list of ingredient lines to a different number of servings, without contacting any website. Give either 'factor' directly, or 'from_servings' and 'to_servings' and the factor is computed. Works on any French ingredient list, whatever its source, so it also serves a recipe the user pasted in. Quantities in grams or millilitres are multiplied and rounded to readable values; a countable thing lands on a half when half of one can be poured, weighed or cut, as a boîte, a sachet, a feuille de gélatine or a cuillère can, and on a whole one when it cannot, as an oeuf, a jaune or a blanc; approximate measures such as a pinch or a handful have their count multiplied in whole units and stay in their own vocabulary. A line writing an article where a digit would go, as in 'un bouchon de rhum' or 'une pincée de sel', is read as one of that measure. Lines carrying no quantity are returned untouched and flagged. Prefer this over doing the arithmetic yourself.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ingredients": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 300
+            },
+            "description": "Ingredient lines, for example ['200 g de farine', '3 oeufs', 'sel']."
+          },
+          "factor": {
+            "description": "Multiplier to apply. Use this or the from/to pair.",
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 100
+          },
+          "from_servings": {
+            "description": "How many servings the list is written for.",
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 500
+          },
+          "to_servings": {
+            "description": "How many servings are wanted.",
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 500
+          }
+        },
+        "required": ["ingredients"],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "factor": {
+            "type": "number"
+          },
+          "ingredients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "original": {
+                  "type": "string",
+                  "description": "The ingredient line exactly as Marmiton publishes it."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The line after scaling, identical to 'original' when unscaled."
+                },
+                "amount": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The scaled quantity, expressed in 'unit'. Read the two together: a large result is moved to a bigger unit, so 200 g scaled tenfold reads as 2 kg, and the bare number shrinks while the quantity grows."
+                },
+                "amountMax": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Upper bound when the line gives a range, as in '200 à 300 g', with 'amount' holding the lower one. Null when the line states a single amount."
+                },
+                "unit": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The unit 'amount' is in, which may differ from the one the recipe used."
+                },
+                "scaling": {
+                  "type": "string",
+                  "enum": ["scaled", "rounded", "unscaled"],
+                  "description": "'scaled' means the arithmetic came out exact, which a count reaches as readily as a mass: one pincée multiplied by six is six pincées. 'rounded' means the value had to be moved to stay usable, to a whole or half unit or to a step a scale can show. 'unscaled' was left as published, because nothing on the line is the factor's to multiply: the note says which of the two it is."
+                },
+                "adjusted": {
+                  "type": "boolean",
+                  "description": "True when rounding moved the value away from the exact product, which is what makes a line 'rounded' rather than 'scaled'."
+                },
+                "note": {
+                  "description": "Why the line was rounded, clamped or left alone, including when the measure is approximate and only its count was multiplied.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "original",
+                "text",
+                "amount",
+                "amountMax",
+                "unit",
+                "scaling",
+                "adjusted"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "scaled_count": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "rounded_count": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Lines whose value rounding moved away from the exact product, not lines that could have been rounded."
+          },
+          "unscaled_count": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "factor",
+          "ingredients",
+          "scaled_count",
+          "rounded_count",
+          "unscaled_count",
+          "notes"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    }
+  ],
+  "version": "2.0.1"
+}
