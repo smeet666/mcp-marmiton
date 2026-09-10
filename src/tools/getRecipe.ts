@@ -182,7 +182,7 @@ export async function runGetRecipe(
       notes.push(...rescalingNotes(ingredients, data.nutrition !== null));
     }
 
-    const attribution = `${data.title} — recette Marmiton — ${data.url}`;
+    const attribution = `${data.title}, recette Marmiton (${data.url})`;
 
     const structured = {
       id: data.id,
