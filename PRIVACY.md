@@ -55,11 +55,12 @@ becomes of them. `MARMITON_LOG_LEVEL` governs how much is written and defaults t
 
 ## The settings that change any of this
 
-| Variable                | What it changes                                                                                                  |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `MARMITON_USER_AGENT`   | Adds your own identifier in front of this project's, which stays appended so the site can always reach a person. |
-| `MARMITON_CACHE_TTL_MS` | How long an answer is held in memory. `0` turns the cache off.                                                   |
-| `MARMITON_LOG_LEVEL`    | How much is written to stderr.                                                                                   |
+| Variable                  | What it changes                                                                                                  |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `MARMITON_USER_AGENT`     | Adds your own identifier in front of this project's, which stays appended so the site can always reach a person. |
+| `MARMITON_CACHE_TTL_MS`   | How long an answer is held in memory. `0` turns the cache off.                                                   |
+| `MARMITON_MAX_BODY_BYTES` | The largest page this reads. A page past it is refused rather than held.                                         |
+| `MARMITON_LOG_LEVEL`      | How much is written to stderr.                                                                                   |
 
 ## Children
 
@@ -131,11 +132,12 @@ qu'ils deviennent. `MARMITON_LOG_LEVEL` règle leur quantité et vaut `error` pa
 
 ## Les réglages qui changent tout cela
 
-| Variable                | Ce qu'elle change                                                                                                        |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `MARMITON_USER_AGENT`   | Ajoute votre identifiant devant celui du projet, qui reste accolé pour que le site puisse toujours joindre une personne. |
-| `MARMITON_CACHE_TTL_MS` | Combien de temps une réponse est gardée en mémoire. `0` éteint le cache.                                                 |
-| `MARMITON_LOG_LEVEL`    | La quantité écrite sur stderr.                                                                                           |
+| Variable                  | Ce qu'elle change                                                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `MARMITON_USER_AGENT`     | Ajoute votre identifiant devant celui du projet, qui reste accolé pour que le site puisse toujours joindre une personne. |
+| `MARMITON_CACHE_TTL_MS`   | Combien de temps une réponse est gardée en mémoire. `0` éteint le cache.                                                 |
+| `MARMITON_MAX_BODY_BYTES` | La plus grande page lue. Au-delà, la page est refusée plutôt que gardée.                                                 |
+| `MARMITON_LOG_LEVEL`      | La quantité écrite sur stderr.                                                                                           |
 
 ## Les enfants
 

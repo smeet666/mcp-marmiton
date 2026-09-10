@@ -7,7 +7,7 @@
  */
 
 import type { Config, Logger } from "../config.js";
-import { MarmitonError, notFound, rateLimited, upstreamError } from "../errors.js";
+import { MarmitonError, notFound, parseFailure, rateLimited, upstreamError } from "../errors.js";
 import { type RateLimiter, sleep } from "./rateLimiter.js";
 
 const CLOSING_HTML_TAG = /<\/html>/i;
@@ -105,6 +105,48 @@ function readAnswer(
  * The retry loop and its sleeps run inside a single limiter slot, so a queued
  * request cannot slip into the window the current one is backing away from.
  */
+/**
+ * The body, read in pieces and stopped at the size this reader holds.
+ *
+ * A deadline abandons a body that arrives slowly. One that arrives quickly and
+ * large is never abandoned by it, and it lands in memory in one piece before
+ * anything looks at it: a page of two hundred megabytes fits inside fifteen
+ * seconds, and what it costs is the whole session rather than the one call.
+ */
+async function readBounded(response: Response, maxBytes: number, url: string): Promise<string> {
+  const stream = response.body;
+  if (stream === null) {
+    return "";
+  }
+
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  const parts: string[] = [];
+  let held = 0;
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      held += value.byteLength;
+      if (held > maxBytes) {
+        throw parseFailure(
+          url,
+          `the page carries more than the ${maxBytes} bytes this reads for one page`,
+        );
+      }
+      parts.push(decoder.decode(value, { stream: true }));
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+
+  parts.push(decoder.decode());
+  return parts.join("");
+}
+
 export async function fetchHtml(url: string, deps: HttpDeps): Promise<string> {
   const { config, limiter, logger } = deps;
   const doFetch = deps.fetchImpl ?? fetch;
@@ -141,7 +183,7 @@ export async function fetchHtml(url: string, deps: HttpDeps): Promise<string> {
         });
         status = response.status;
         retryAfterMs = parseRetryAfter(response.headers.get("retry-after"));
-        body = await response.text();
+        body = await readBounded(response, config.maxBodyBytes, url);
       } catch (error) {
         lastError = asTransportError(error, url);
         logger.debug(`${lastError.code} for ${url}: ${lastError.message}`);
