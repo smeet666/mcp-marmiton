@@ -115,8 +115,11 @@ function readAnswer(
  */
 async function readBounded(response: Response, maxBytes: number, url: string): Promise<string> {
   const stream = response.body;
-  if (stream === null) {
-    return "";
+  // A response carrying no readable stream is read whole. Nothing arrives in
+  // pieces to count, and the body still has to be waited for, so a caller
+  // holding a deadline over this read keeps it.
+  if (!stream) {
+    return await response.text();
   }
 
   const reader = stream.getReader();
