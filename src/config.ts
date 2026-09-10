@@ -18,6 +18,8 @@ export interface Config {
   maxRetries: number;
   cacheTtlMs: number;
   cacheMaxEntries: number;
+  /** The largest page this reader holds, in bytes. */
+  maxBodyBytes: number;
   logLevel: LogLevel;
 }
 
@@ -33,6 +35,10 @@ export const DEFAULTS = {
   maxRetries: 3,
   cacheTtlMs: 15 * 60 * 1000,
   cacheMaxEntries: 200,
+  // Recipe pages run to tens of kilobytes. A body an order of magnitude past
+  // that is a page this reader has no reading for, and finding that out by
+  // holding it costs the caller the memory and the site the transfer.
+  maxBodyBytes: 8_000_000,
   logLevel: "error" as LogLevel,
 };
 
@@ -150,6 +156,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       min: 0,
       max: 10_000,
       fallback: DEFAULTS.cacheMaxEntries,
+    }),
+    maxBodyBytes: readNumber("MARMITON_MAX_BODY_BYTES", env, {
+      min: 100_000,
+      max: 64_000_000,
+      fallback: DEFAULTS.maxBodyBytes,
     }),
     logLevel,
   };
