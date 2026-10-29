@@ -1,3 +1,4 @@
+import { inspect } from "node:util";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -69,7 +70,7 @@ describe("hasType", () => {
 
   it("is safe on anything that is not a node", () => {
     for (const v of [null, undefined, 3, "Recipe", []]) {
-      expect(hasType(v, "Recipe"), String(v)).toBe(false);
+      expect(hasType(v, "Recipe"), inspect(v)).toBe(false);
     }
   });
 });
@@ -109,7 +110,7 @@ describe("asString", () => {
 
   it("returns null on what it cannot read", () => {
     for (const v of [null, undefined, {}, [], 0, false]) {
-      expect(asString(v), String(v)).toBeNull();
+      expect(asString(v), inspect(v)).toBeNull();
     }
   });
 });
@@ -126,7 +127,7 @@ describe("asNumber", () => {
 
   it("returns null on what is not a number", () => {
     for (const v of [null, undefined, "abc", {}, [], Number.NaN]) {
-      expect(asNumber(v), String(v)).toBeNull();
+      expect(asNumber(v), inspect(v)).toBeNull();
     }
   });
 });
@@ -151,7 +152,7 @@ describe("asStringList", () => {
 
   it("returns an empty list for anything unreadable", () => {
     for (const v of [null, undefined, 3, {}]) {
-      expect(asStringList(v), String(v)).toEqual([]);
+      expect(asStringList(v), inspect(v)).toEqual([]);
     }
   });
 
